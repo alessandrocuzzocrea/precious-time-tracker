@@ -4,10 +4,11 @@ import (
 	"database/sql"
 	"log"
 	"net/http"
-	"os"
 
+	"github.com/pressly/goose/v3"
 	"github.com/user/precious-time-tracker/internal/database"
 	"github.com/user/precious-time-tracker/internal/server"
+	"github.com/user/precious-time-tracker/sql/schema"
 	_ "modernc.org/sqlite"
 )
 
@@ -19,15 +20,15 @@ func main() {
 	}
 	defer db.Close()
 
-	// Create table if not exists (rudimentary migration for v1)
-	schema, err := os.ReadFile("./sql/schema/001_users_and_entries.sql")
-	if err != nil {
+	// Run migrations
+	goose.SetBaseFS(schema.FS)
+
+	if err := goose.SetDialect("sqlite"); err != nil {
 		log.Fatal(err)
 	}
-	if _, err := db.Exec(string(schema)); err != nil {
-		// Ignore error if table exists?
-		// "table time_entries already exists"
-		log.Printf("Schema exec warning (might already exist): %v", err)
+
+	if err := goose.Up(db, "."); err != nil {
+		log.Fatal(err)
 	}
 
 	dbQueries := database.New(db)

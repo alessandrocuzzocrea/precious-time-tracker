@@ -3,10 +3,11 @@ package database
 import (
 	"context"
 	"database/sql"
-	"os"
 	"testing"
 	"time"
 
+	"github.com/pressly/goose/v3"
+	"github.com/user/precious-time-tracker/sql/schema"
 	_ "modernc.org/sqlite"
 )
 
@@ -18,18 +19,14 @@ func TestQueries(t *testing.T) {
 	}
 	defer db.Close()
 
-	// Load schema
-	wd, _ := os.Getwd()
-	t.Logf("Current working directory: %s", wd)
-	schemaPath := "../../sql/schema/001_users_and_entries.sql"
-	schema, err := os.ReadFile(schemaPath)
-	if err != nil {
-		t.Fatalf("failed to read schema from %s: %v", schemaPath, err)
+	// Load and apply schema using Goose
+	goose.SetBaseFS(schema.FS)
+	if err := goose.SetDialect("sqlite"); err != nil {
+		t.Fatalf("failed to set dialect: %v", err)
 	}
 
-	// Exec schema
-	if _, err := db.Exec(string(schema)); err != nil {
-		t.Fatalf("failed to execute schema: %v", err)
+	if err := goose.Up(db, "."); err != nil {
+		t.Fatalf("failed to run migrations: %v", err)
 	}
 
 	q := New(db)

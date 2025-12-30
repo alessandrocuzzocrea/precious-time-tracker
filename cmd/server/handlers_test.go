@@ -11,8 +11,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/pressly/goose/v3"
 	"github.com/user/precious-time-tracker/internal/database"
 	"github.com/user/precious-time-tracker/internal/server"
+	"github.com/user/precious-time-tracker/sql/schema"
 
 	_ "modernc.org/sqlite"
 )
@@ -41,19 +43,16 @@ func newTestServer(t *testing.T) *server.Server {
 		t.Fatalf("failed to open db: %v", err)
 	}
 
-	root, err := getProjectRoot()
-	if err != nil {
-		t.Fatalf("failed to find project root: %v", err)
+	// Create a temp file or just use the FS with goose
+	goose.SetBaseFS(schema.FS)
+	if err := goose.SetDialect("sqlite"); err != nil {
+		t.Fatalf("failed to set dialect: %v", err)
 	}
+	// We need to disable logging or it will span stdout
+	// goose.SetLogger(goose.NopLogger())
 
-	// Load schema
-	schemaPath := filepath.Join(root, "sql/schema/001_users_and_entries.sql")
-	schemaBytes, err := os.ReadFile(schemaPath)
-	if err != nil {
-		t.Fatalf("failed to read schema from %s: %v", schemaPath, err)
-	}
-	if _, err := db.Exec(string(schemaBytes)); err != nil {
-		t.Fatalf("failed to execute schema: %v", err)
+	if err := goose.Up(db, "."); err != nil {
+		t.Fatalf("failed to run migrations: %v", err)
 	}
 
 	dbQueries := database.New(db)

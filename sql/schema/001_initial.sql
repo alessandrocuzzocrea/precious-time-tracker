@@ -1,3 +1,4 @@
+-- +goose Up
 CREATE TABLE time_entries (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     description TEXT NOT NULL,
@@ -5,3 +6,6 @@ CREATE TABLE time_entries (
     end_time DATETIME,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- +goose Down
+DROP TABLE time_entries;
