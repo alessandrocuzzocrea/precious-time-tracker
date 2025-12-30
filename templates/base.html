@@ -8,13 +8,23 @@
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-    <div id="sticky-active-bar" class="sticky-bar" {{if .Active}}style="display: flex;" data-start-time="{{.Active.StartTime.Format "2006-01-02T15:04:05Z07:00"}}"{{else}}style="display: none;"{{end}}>
+    <div id="sticky-active-bar" class="sticky-bar" 
+         {{if .Active}}data-state="active" data-start-time="{{.Active.StartTime.Format "2006-01-02T15:04:05Z07:00"}}"{{else}}data-state="idle"{{end}}>
         <div class="sticky-bar-content">
-            <span class="sticky-description">Tracking: <strong>{{if .Active}}{{.Active.Description}}{{end}}</strong></span>
-            <span class="sticky-duration-container">Duration: <span id="sticky-duration">0s</span></span>
-            <form action="/stop" method="POST" style="margin: 0;">
-                <button type="submit" class="btn btn-stop btn-sm">Stop</button>
-            </form>
+            {{if .Active}}
+                <div class="tracking-info">
+                    <span class="sticky-description">Tracking: <strong>{{.Active.Description}}</strong></span>
+                    <span class="sticky-duration-container">Duration: <span id="sticky-duration">0s</span></span>
+                </div>
+                <form action="/stop" method="POST" style="margin: 0;">
+                    <button type="submit" class="btn btn-stop btn-sm">Stop</button>
+                </form>
+            {{else}}
+                <form action="/start" method="POST" class="global-start-form">
+                    <input type="text" name="description" placeholder="What are you working on?" required class="sticky-input">
+                    <button type="submit" class="btn btn-start btn-sm">Start</button>
+                </form>
+            {{end}}
         </div>
     </div>
     <div class="container">
@@ -31,15 +41,10 @@
     </div>
     <script>
         function updateActiveDuration() {
-            // Priority: Page-specific active-timer (often enhanced with more meta)
-            // Fallback: Global sticky-active-bar
-            const activePageTimer = document.getElementById('active-timer');
             const stickyBar = document.getElementById('sticky-active-bar');
-            
-            const activeTimer = activePageTimer || stickyBar;
-            if (!activeTimer || activeTimer.style.display === 'none') return;
+            if (!stickyBar || stickyBar.dataset.state !== 'active') return;
 
-            const startTimeStr = activeTimer.dataset.startTime;
+            const startTimeStr = stickyBar.dataset.startTime;
             if (!startTimeStr) return;
 
             const startTime = new Date(startTimeStr);
