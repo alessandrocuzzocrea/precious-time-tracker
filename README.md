@@ -5,6 +5,7 @@ A simple, efficient, and lightweight time tracking application built with **Go**
 ![Precious Time Tracker](https://img.shields.io/badge/Status-Active-brightgreen)
 ![Go Version](https://img.shields.io/badge/Go-1.25.5-blue)
 [![CI/CD](https://github.com/alessandrocuzzocrea/precious-time-tracker/actions/workflows/ci-cd.yaml/badge.svg)](https://github.com/alessandrocuzzocrea/precious-time-tracker/actions)
+[![codecov](https://codecov.io/github/alessandrocuzzocrea/precious-time-tracker/branch/main/graph/badge.svg?token=HXPMA8FXR1)](https://codecov.io/github/alessandrocuzzocrea/precious-time-tracker)
 
 ## Features
 
