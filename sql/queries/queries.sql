@@ -18,6 +18,7 @@ RETURNING *;
 SELECT te.*, c.name as category_name, c.color as category_color 
 FROM time_entries te
 LEFT JOIN categories c ON te.category_id = c.id
+WHERE te.end_time IS NOT NULL
 ORDER BY te.start_time DESC
 LIMIT 50;
 

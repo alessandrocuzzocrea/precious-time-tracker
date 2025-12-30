@@ -212,6 +212,12 @@ func TestTimeEntryWithCategory(t *testing.T) {
 		t.Errorf("expected category ID %d, got %v", cat.ID, entry.CategoryID)
 	}
 
+	// Stop it so it appears in ListTimeEntries
+	err = svc.StopTimer(ctx)
+	if err != nil {
+		t.Fatalf("StopTimer failed: %v", err)
+	}
+
 	// Check List
 	entries, _ := svc.ListTimeEntries(ctx)
 	if len(entries) == 0 || entries[0].CategoryName.String != "Work" {

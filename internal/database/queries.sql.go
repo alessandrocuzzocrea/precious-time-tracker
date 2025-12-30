@@ -329,6 +329,7 @@ const listTimeEntries = `-- name: ListTimeEntries :many
 SELECT te.id, te.description, te.start_time, te.end_time, te.created_at, te.category_id, c.name as category_name, c.color as category_color 
 FROM time_entries te
 LEFT JOIN categories c ON te.category_id = c.id
+WHERE te.end_time IS NOT NULL
 ORDER BY te.start_time DESC
 LIMIT 50
 `
