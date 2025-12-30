@@ -267,6 +267,7 @@ func TestParseTags(t *testing.T) {
 func TestGetReport(t *testing.T) {
 	svc := newTestService(t)
 	ctx := context.Background()
+	var err error
 
 	cat1, _ := svc.CreateCategory(ctx, "Work", "#ff0000")
 	cat2, _ := svc.CreateCategory(ctx, "Personal", "#00ff00")
@@ -274,20 +275,32 @@ func TestGetReport(t *testing.T) {
 	now := time.Now()
 	// Entry 1: Work, today, with tag1
 	e1, _ := svc.StartTimer(ctx, "Work #tag1", &cat1.ID)
-	svc.UpdateTimeEntry(ctx, e1.ID, e1.Description, now.Add(-2*time.Hour), sql.NullTime{Time: now.Add(-1 * time.Hour), Valid: true}, &cat1.ID)
+	_, err = svc.UpdateTimeEntry(ctx, e1.ID, e1.Description, now.Add(-2*time.Hour), sql.NullTime{Time: now.Add(-1 * time.Hour), Valid: true}, &cat1.ID)
+	if err != nil {
+		t.Fatalf("failed to update e1: %v", err)
+	}
 
 	// Entry 2: Personal, today, with tag1 and tag2
 	e2, _ := svc.StartTimer(ctx, "Personal #tag1 #tag2", &cat2.ID)
-	svc.UpdateTimeEntry(ctx, e2.ID, e2.Description, now.Add(-30*time.Minute), sql.NullTime{Time: now, Valid: true}, &cat2.ID)
+	_, err = svc.UpdateTimeEntry(ctx, e2.ID, e2.Description, now.Add(-30*time.Minute), sql.NullTime{Time: now, Valid: true}, &cat2.ID)
+	if err != nil {
+		t.Fatalf("failed to update e2: %v", err)
+	}
 
 	// Entry 3: No category, today, with tag2
 	e3, _ := svc.StartTimer(ctx, "Uncategorized #tag2", nil)
-	svc.UpdateTimeEntry(ctx, e3.ID, e3.Description, now.Add(-15*time.Minute), sql.NullTime{Time: now.Add(-5 * time.Minute), Valid: true}, nil)
+	_, err = svc.UpdateTimeEntry(ctx, e3.ID, e3.Description, now.Add(-15*time.Minute), sql.NullTime{Time: now.Add(-5 * time.Minute), Valid: true}, nil)
+	if err != nil {
+		t.Fatalf("failed to update e3: %v", err)
+	}
 
 	// Entry 4: Yesterday (different period)
 	yesterday := now.AddDate(0, 0, -1)
 	e4, _ := svc.StartTimer(ctx, "Yesterday", &cat1.ID)
-	svc.UpdateTimeEntry(ctx, e4.ID, e4.Description, yesterday, sql.NullTime{Time: yesterday.Add(time.Hour), Valid: true}, &cat1.ID)
+	_, err = svc.UpdateTimeEntry(ctx, e4.ID, e4.Description, yesterday, sql.NullTime{Time: yesterday.Add(time.Hour), Valid: true}, &cat1.ID)
+	if err != nil {
+		t.Fatalf("failed to update e4: %v", err)
+	}
 
 	startToday := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	endToday := startToday.AddDate(0, 0, 1).Add(-time.Second)
@@ -358,6 +371,12 @@ func TestGetReport(t *testing.T) {
 			foundNoCategory = true
 		}
 	}
+	// Note: In this specific filter (tag1 AND tag2), e3 is NOT present, so foundNoCategory remains false.
+	// We check it here to avoid ineffassign before re-assigning it below.
+	if len(report.Entries) == 1 && foundNoCategory {
+		t.Errorf("No Category should not be in breakdown for this specific filter")
+	}
+
 	// In the tags filter above, e2 is the only one, so breakdown should have Personal (100%)
 	// Let's check a report without tag filter for breakdown
 	report, _ = svc.GetReport(ctx, ReportFilter{
