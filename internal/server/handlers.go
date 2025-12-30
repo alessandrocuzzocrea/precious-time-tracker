@@ -167,7 +167,7 @@ func (s *Server) handleStartTimer(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to start transaction", http.StatusInternalServerError)
 		return
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	qtx := s.DB.WithTx(tx)
 
 	// Stop any currently active timer
@@ -333,7 +333,7 @@ func (s *Server) handleUpdateEntry(w http.ResponseWriter, r *http.Request) {
 		s.render(w, "edit-entry-row", editData{Entry: originalEntry, Error: "Database error"})
 		return
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	qtx := s.DB.WithTx(tx)
 
 	entry, err := qtx.UpdateTimeEntryFull(r.Context(), database.UpdateTimeEntryFullParams{
