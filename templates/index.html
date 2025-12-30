@@ -1,0 +1,48 @@
+{{define "content"}}
+<div class="timer-controls">
+    {{if .Active}}
+        <div class="active-timer">
+            <p>Tracking: <strong>{{.Active.Description}}</strong></p>
+            <p>Started at: {{.Active.StartTime.Format "15:04:05"}}</p>
+            <form action="/stop" method="POST">
+                <button type="submit" class="btn btn-stop">Stop</button>
+            </form>
+        </div>
+    {{else}}
+        <div class="new-timer">
+            <form action="/start" method="POST">
+                <input type="text" name="description" placeholder="What are you working on?" required>
+                <button type="submit" class="btn btn-start">Start</button>
+            </form>
+        </div>
+    {{end}}
+</div>
+
+<div class="entries-list">
+    <h2>Recent Entries</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Description</th>
+                <th>Start</th>
+                <th>End</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range .Entries}}
+            <tr>
+                <td>{{.Description}}</td>
+                <td>{{.StartTime.Format "Jan 02 15:04"}}</td>
+                <td>
+                    {{if .EndTime.Valid}}
+                        {{.EndTime.Time.Format "15:04"}}
+                    {{else}}
+                        <em>Active</em>
+                    {{end}}
+                </td>
+            </tr>
+            {{end}}
+        </tbody>
+    </table>
+</div>
+{{end}}
