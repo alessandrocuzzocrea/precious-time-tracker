@@ -43,11 +43,18 @@
         <input type="text" name="description" value="{{.Description}}" class="form-control" autofocus>
     </td>
     <td>
-        <input type="datetime-local" name="start_time" value="{{.StartTime.Format "2006-01-02T15:04:05"}}" step="1">
+        <input type="text" name="start_time" 
+               value="{{.StartTime.Format "2006-01-02 15:04:05"}}" 
+               placeholder="YYYY-MM-DD HH:MM:SS"
+               class="form-control"
+               style="width: 160px;">
     </td>
     <td>
-        <input type="datetime-local" name="end_time" 
-               value="{{if .EndTime.Valid}}{{.EndTime.Time.Format "2006-01-02T15:04:05"}}{{end}}" step="1">
+        <input type="text" name="end_time" 
+               value="{{if .EndTime.Valid}}{{.EndTime.Time.Format "2006-01-02 15:04:05"}}{{end}}" 
+               placeholder="YYYY-MM-DD HH:MM:SS"
+               class="form-control"
+               style="width: 160px;">
     </td>
     <td>
         <button class="btn btn-sm btn-primary" 
