@@ -9,7 +9,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/user/precious-time-tracker/internal/database"
+	"github.com/alessandrocuzzocrea/precious-time-tracker/internal/database"
+	"github.com/alessandrocuzzocrea/precious-time-tracker/internal/service"
 )
 
 type editData struct {
@@ -29,6 +30,7 @@ func (s *Server) routes() {
 	s.Router.HandleFunc("POST /categories", s.handleCreateCategory)
 	s.Router.HandleFunc("POST /categories/{id}", s.handleUpdateCategory)
 	s.Router.HandleFunc("DELETE /categories/{id}", s.handleDeleteCategory)
+	s.Router.HandleFunc("GET /reports", s.handleReports)
 	s.Router.HandleFunc("PUT /entry/{id}", s.handleUpdateEntry)
 	s.Router.HandleFunc("PATCH /entry/active", s.handleUpdateActiveEntry)
 	s.Router.HandleFunc("DELETE /entry/{id}", s.handleDeleteEntry)
@@ -43,9 +45,18 @@ func formatDuration(start time.Time, end sql.NullTime) string {
 	return d.Round(time.Second).String()
 }
 
+func formatDurationSeconds(seconds int64) string {
+	d := time.Duration(seconds) * time.Second
+	if d < time.Hour {
+		return fmt.Sprintf("%dm %ds", int(d.Minutes()), int(d.Seconds())%60)
+	}
+	return fmt.Sprintf("%dh %dm", int(d.Hours()), int(d.Minutes())%60)
+}
+
 func (s *Server) render(w http.ResponseWriter, r *http.Request, tmplName string, data interface{}, files ...string) {
 	funcs := template.FuncMap{
-		"duration": formatDuration,
+		"duration":         formatDuration,
+		"duration_seconds": formatDurationSeconds,
 	}
 
 	allFiles := append([]string{"templates/fragments.html"}, files...)
@@ -370,6 +381,83 @@ func (s *Server) handleUpdateCategory(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Redirect(w, r, "/categories", http.StatusSeeOther)
+}
+
+func (s *Server) handleReports(w http.ResponseWriter, r *http.Request) {
+	period := r.URL.Query().Get("period")
+	if period == "" {
+		period = "today"
+	}
+
+	now := time.Now()
+	var start, end time.Time
+
+	switch period {
+	case "today":
+		start = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+		end = start.AddDate(0, 0, 1).Add(-time.Second)
+	case "week":
+		// Assume week starts on Monday
+		weekday := int(now.Weekday())
+		if weekday == 0 {
+			weekday = 7
+		}
+		start = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).AddDate(0, 0, -weekday+1)
+		end = start.AddDate(0, 0, 7).Add(-time.Second)
+	case "month":
+		start = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+		end = start.AddDate(0, 1, 0).Add(-time.Second)
+	case "year":
+		start = time.Date(now.Year(), 1, 1, 0, 0, 0, 0, now.Location())
+		end = start.AddDate(1, 0, 0).Add(-time.Second)
+	default: // "all" or anything else
+		start = time.Time{}
+		end = now.AddDate(100, 0, 0) // Far future
+	}
+
+	catFilterStr := r.URL.Query().Get("category_id")
+	var catFilter int64
+	if catFilterStr != "" {
+		catFilter, _ = strconv.ParseInt(catFilterStr, 10, 64)
+	}
+
+	tagIDsStr := r.URL.Query()["tag_ids"]
+	var tagIDs []int64
+	for _, idStr := range tagIDsStr {
+		if id, err := strconv.ParseInt(idStr, 10, 64); err == nil {
+			tagIDs = append(tagIDs, id)
+		}
+	}
+
+	report, err := s.Service.GetReport(r.Context(), service.ReportFilter{
+		StartDate:      start,
+		EndDate:        end,
+		CategoryFilter: catFilter,
+		TagIDs:         tagIDs,
+	})
+	if err != nil {
+		log.Printf("Error getting report: %v", err)
+		http.Error(w, "Failed to get report", http.StatusInternalServerError)
+		return
+	}
+
+	categories, _ := s.Service.ListCategories(r.Context())
+	tags, _ := s.Service.ListTags(r.Context())
+
+	data := map[string]interface{}{
+		"Report":           report,
+		"Categories":       categories,
+		"Tags":             tags,
+		"Period":           period,
+		"SelectedCategory": catFilter,
+		"SelectedTags":     tagIDs,
+	}
+
+	if r.Header.Get("HX-Request") == "true" {
+		s.render(w, r, "report-content", data, "templates/reports.html")
+	} else {
+		s.render(w, r, "", data, "templates/base.html", "templates/reports.html")
+	}
 }
 
 func (s *Server) handleDeleteCategory(w http.ResponseWriter, r *http.Request) {

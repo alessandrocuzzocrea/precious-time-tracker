@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alessandrocuzzocrea/precious-time-tracker/internal/database"
+	"github.com/alessandrocuzzocrea/precious-time-tracker/sql/schema"
 	"github.com/pressly/goose/v3"
-	"github.com/user/precious-time-tracker/internal/database"
-	"github.com/user/precious-time-tracker/sql/schema"
 
 	_ "modernc.org/sqlite"
 )
@@ -261,5 +261,139 @@ func TestParseTags(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestGetReport(t *testing.T) {
+	svc := newTestService(t)
+	ctx := context.Background()
+	var err error
+
+	cat1, _ := svc.CreateCategory(ctx, "Work", "#ff0000")
+	cat2, _ := svc.CreateCategory(ctx, "Personal", "#00ff00")
+
+	now := time.Now()
+	// Entry 1: Work, today, with tag1
+	e1, _ := svc.StartTimer(ctx, "Work #tag1", &cat1.ID)
+	_, err = svc.UpdateTimeEntry(ctx, e1.ID, e1.Description, now.Add(-2*time.Hour), sql.NullTime{Time: now.Add(-1 * time.Hour), Valid: true}, &cat1.ID)
+	if err != nil {
+		t.Fatalf("failed to update e1: %v", err)
+	}
+
+	// Entry 2: Personal, today, with tag1 and tag2
+	e2, _ := svc.StartTimer(ctx, "Personal #tag1 #tag2", &cat2.ID)
+	_, err = svc.UpdateTimeEntry(ctx, e2.ID, e2.Description, now.Add(-30*time.Minute), sql.NullTime{Time: now, Valid: true}, &cat2.ID)
+	if err != nil {
+		t.Fatalf("failed to update e2: %v", err)
+	}
+
+	// Entry 3: No category, today, with tag2
+	e3, _ := svc.StartTimer(ctx, "Uncategorized #tag2", nil)
+	_, err = svc.UpdateTimeEntry(ctx, e3.ID, e3.Description, now.Add(-15*time.Minute), sql.NullTime{Time: now.Add(-5 * time.Minute), Valid: true}, nil)
+	if err != nil {
+		t.Fatalf("failed to update e3: %v", err)
+	}
+
+	// Entry 4: Yesterday (different period)
+	yesterday := now.AddDate(0, 0, -1)
+	e4, _ := svc.StartTimer(ctx, "Yesterday", &cat1.ID)
+	_, err = svc.UpdateTimeEntry(ctx, e4.ID, e4.Description, yesterday, sql.NullTime{Time: yesterday.Add(time.Hour), Valid: true}, &cat1.ID)
+	if err != nil {
+		t.Fatalf("failed to update e4: %v", err)
+	}
+
+	startToday := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	endToday := startToday.AddDate(0, 0, 1).Add(-time.Second)
+
+	// 1. All Categories, Today, No Tags
+	report, err := svc.GetReport(ctx, ReportFilter{
+		StartDate:      startToday,
+		EndDate:        endToday,
+		CategoryFilter: 0,
+	})
+	if err != nil {
+		t.Fatalf("GetReport failed: %v", err)
+	}
+	if len(report.Entries) != 3 {
+		t.Errorf("expected 3 entries, got %d", len(report.Entries))
+	}
+	expectedTotal := int64((1 * time.Hour).Seconds() + (30 * time.Minute).Seconds() + (10 * time.Minute).Seconds())
+	if report.TotalSeconds != expectedTotal {
+		t.Errorf("expected total %ds, got %ds", expectedTotal, report.TotalSeconds)
+	}
+
+	// 2. Filter by Category 1 (Work)
+	report, _ = svc.GetReport(ctx, ReportFilter{
+		StartDate:      startToday,
+		EndDate:        endToday,
+		CategoryFilter: cat1.ID,
+	})
+	if len(report.Entries) != 1 || report.Entries[0].ID != e1.ID {
+		t.Errorf("expected entry e1, got %v", report.Entries)
+	}
+
+	// 3. Filter by "No Category"
+	report, _ = svc.GetReport(ctx, ReportFilter{
+		StartDate:      startToday,
+		EndDate:        endToday,
+		CategoryFilter: -1,
+	})
+	if len(report.Entries) != 1 || report.Entries[0].ID != e3.ID {
+		t.Errorf("expected entry e3, got %v", report.Entries)
+	}
+
+	// 4. Filter by Multiple Tags (AND)
+	tags, _ := svc.ListTags(ctx)
+	var tag1ID, tag2ID int64
+	for _, tg := range tags {
+		if tg.Name == "tag1" {
+			tag1ID = tg.ID
+		}
+		if tg.Name == "tag2" {
+			tag2ID = tg.ID
+		}
+	}
+
+	report, _ = svc.GetReport(ctx, ReportFilter{
+		StartDate:      startToday,
+		EndDate:        endToday,
+		CategoryFilter: 0,
+		TagIDs:         []int64{tag1ID, tag2ID},
+	})
+	if len(report.Entries) != 1 || report.Entries[0].ID != e2.ID {
+		t.Errorf("expected entry e2, got %v", report.Entries)
+	}
+
+	// 5. Verify breakdown
+	foundNoCategory := false
+	for _, b := range report.CategoryBreakdown {
+		if b.CategoryID == -1 {
+			foundNoCategory = true
+		}
+	}
+	// Note: In this specific filter (tag1 AND tag2), e3 is NOT present, so foundNoCategory remains false.
+	// We check it here to avoid ineffassign before re-assigning it below.
+	if len(report.Entries) == 1 && foundNoCategory {
+		t.Errorf("No Category should not be in breakdown for this specific filter")
+	}
+
+	// In the tags filter above, e2 is the only one, so breakdown should have Personal (100%)
+	// Let's check a report without tag filter for breakdown
+	report, _ = svc.GetReport(ctx, ReportFilter{
+		StartDate:      startToday,
+		EndDate:        endToday,
+		CategoryFilter: 0,
+	})
+	foundNoCategory = false
+	for _, b := range report.CategoryBreakdown {
+		if b.CategoryID == -1 {
+			foundNoCategory = true
+			if b.TotalSeconds != 600 { // 10 minutes
+				t.Errorf("expected 600s for No Category, got %d", b.TotalSeconds)
+			}
+		}
+	}
+	if !foundNoCategory {
+		t.Errorf("No Category not found in breakdown")
 	}
 }

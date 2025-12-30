@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alessandrocuzzocrea/precious-time-tracker/sql/schema"
 	"github.com/pressly/goose/v3"
-	"github.com/user/precious-time-tracker/sql/schema"
 	_ "modernc.org/sqlite"
 )
 
@@ -71,12 +71,20 @@ func TestQueries(t *testing.T) {
 
 	// Test 4: ListTimeEntries
 	// Create another one to have list
-	_, err = q.CreateTimeEntry(ctx, CreateTimeEntryParams{
+	entry2, err := q.CreateTimeEntry(ctx, CreateTimeEntryParams{
 		Description: "Task 2",
 		StartTime:   time.Now(),
 	})
 	if err != nil {
 		t.Fatalf("Second CreateTimeEntry failed: %v", err)
+	}
+	// ListTimeEntries excludes active ones, so stop it
+	_, err = q.UpdateTimeEntry(ctx, UpdateTimeEntryParams{
+		EndTime: sql.NullTime{Time: time.Now(), Valid: true},
+		ID:      entry2.ID,
+	})
+	if err != nil {
+		t.Fatalf("Stopping second entry failed: %v", err)
 	}
 
 	list, err := q.ListTimeEntries(ctx)

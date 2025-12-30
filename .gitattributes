@@ -1,0 +1,27 @@
+# Default behavior for all files:
+# - Auto-detect text files and normalize them to LF on check-in.
+# - Force LF on checkout on all platforms.
+* text=auto eol=lf
+
+# Explicitly mark certain extensions as text:
+*.go text eol=lf
+*.md text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+*.js text eol=lf
+*.sql text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.toml text eol=lf
+*.json text eol=lf
+.gitignore text eol=lf
+Dockerfile text eol=lf
+
+# Denote binary files (don't touch these):
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.sqlite3 binary
+*.exe binary

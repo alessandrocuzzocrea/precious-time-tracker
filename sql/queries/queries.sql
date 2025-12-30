@@ -102,3 +102,16 @@ WHERE id = ?;
 -- name: GetCategory :one
 SELECT * FROM categories
 WHERE id = ?;
+-- name: ListTimeEntriesReport :many
+SELECT te.*, c.name as category_name, c.color as category_color 
+FROM time_entries te
+LEFT JOIN categories c ON te.category_id = c.id
+WHERE te.end_time IS NOT NULL
+AND te.start_time >= ?
+AND te.start_time <= ?
+AND (
+    (sqlc.arg('category_filter') = 0)
+    OR (te.category_id = sqlc.arg('category_filter'))
+    OR (sqlc.arg('category_filter') = -1 AND te.category_id IS NULL)
+)
+ORDER BY te.start_time DESC;

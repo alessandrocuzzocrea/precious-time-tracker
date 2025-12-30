@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/user/precious-time-tracker/internal/database"
+	"github.com/alessandrocuzzocrea/precious-time-tracker/internal/database"
 )
 
 type Service struct {
@@ -222,4 +222,117 @@ func (s *Service) DeleteTimeEntry(ctx context.Context, id int64) error {
 	// Best effort cleanup
 	_ = s.db.DeleteOrphanedTags(ctx)
 	return nil
+}
+
+type ReportFilter struct {
+	StartDate      time.Time
+	EndDate        time.Time
+	CategoryFilter int64   // 0: All, -1: No Category, >0: Specific Category
+	TagIDs         []int64 // AND filter
+}
+
+type CategoryBreakdown struct {
+	CategoryID   int64
+	CategoryName string
+	Color        string
+	TotalSeconds int64
+	Percentage   float64
+}
+
+type ReportData struct {
+	Entries           []database.ListTimeEntriesReportRow
+	TotalSeconds      int64
+	CategoryBreakdown []CategoryBreakdown
+	Filter            ReportFilter
+}
+
+func (s *Service) GetReport(ctx context.Context, filter ReportFilter) (ReportData, error) {
+	rows, err := s.db.ListTimeEntriesReport(ctx, database.ListTimeEntriesReportParams{
+		StartTime:      filter.StartDate,
+		StartTime_2:    filter.EndDate,
+		CategoryFilter: filter.CategoryFilter,
+	})
+	if err != nil {
+		return ReportData{}, err
+	}
+
+	var filteredRows []database.ListTimeEntriesReportRow
+	categoryTotals := make(map[int64]*CategoryBreakdown)
+	var totalSeconds int64
+
+	// Initialize "No Category" breakdown
+	noCategory := &CategoryBreakdown{
+		CategoryID:   -1,
+		CategoryName: "No Category",
+		Color:        "#888888",
+	}
+
+	for _, row := range rows {
+		// Filter by tags (AND logic)
+		if len(filter.TagIDs) > 0 {
+			entryTags, err := s.db.ListTagsForTimeEntry(ctx, row.ID)
+			if err != nil {
+				continue
+			}
+			tagMap := make(map[int64]bool)
+			for _, t := range entryTags {
+				tagMap[t.ID] = true
+			}
+			matchAll := true
+			for _, id := range filter.TagIDs {
+				if !tagMap[id] {
+					matchAll = false
+					break
+				}
+			}
+			if !matchAll {
+				continue
+			}
+		}
+
+		duration := row.EndTime.Time.Sub(row.StartTime)
+		seconds := int64(duration.Seconds())
+		totalSeconds += seconds
+
+		if row.CategoryID.Valid {
+			catID := row.CategoryID.Int64
+			if _, ok := categoryTotals[catID]; !ok {
+				categoryTotals[catID] = &CategoryBreakdown{
+					CategoryID:   catID,
+					CategoryName: row.CategoryName.String,
+					Color:        row.CategoryColor.String,
+				}
+			}
+			categoryTotals[catID].TotalSeconds += seconds
+		} else {
+			noCategory.TotalSeconds += seconds
+		}
+
+		filteredRows = append(filteredRows, row)
+	}
+
+	var breakdown []CategoryBreakdown
+	if totalSeconds > 0 {
+		for _, b := range categoryTotals {
+			b.Percentage = (float64(b.TotalSeconds) / float64(totalSeconds)) * 100
+			breakdown = append(breakdown, *b)
+		}
+		if noCategory.TotalSeconds > 0 {
+			noCategory.Percentage = (float64(noCategory.TotalSeconds) / float64(totalSeconds)) * 100
+			breakdown = append(breakdown, *noCategory)
+		}
+	} else if noCategory.TotalSeconds > 0 || len(categoryTotals) > 0 {
+		// This case shouldn't really happen if totalSeconds is 0, but for completeness
+		for _, b := range categoryTotals {
+			breakdown = append(breakdown, *b)
+		}
+		breakdown = append(breakdown, *noCategory)
+	}
+
+	return ReportData{
+		Entries:           filteredRows,
+		TotalSeconds:      totalSeconds,
+		CategoryBreakdown: breakdown,
+		Filter:            filter,
+	}, nil
 }

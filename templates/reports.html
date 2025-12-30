@@ -1,0 +1,117 @@
+{{define "content"}}
+<div class="reports-container">
+    <h2>Reports</h2>
+    
+    <form hx-get="/reports" hx-target="#report-results" hx-trigger="change from:input, change from:select" class="filter-form">
+        <div class="filter-row">
+            <div class="filter-group">
+                <label>Period</label>
+                <select name="period">
+                    <option value="today" {{if eq .Period "today"}}selected{{end}}>Today</option>
+                    <option value="week" {{if eq .Period "week"}}selected{{end}}>This Week</option>
+                    <option value="month" {{if eq .Period "month"}}selected{{end}}>This Month</option>
+                    <option value="year" {{if eq .Period "year"}}selected{{end}}>This Year</option>
+                    <option value="all" {{if eq .Period "all"}}selected{{end}}>All Time</option>
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <label>Category</label>
+                <select name="category_id">
+                    <option value="0" {{if eq .SelectedCategory 0}}selected{{end}}>All Categories</option>
+                    <option value="-1" {{if eq .SelectedCategory -1}}selected{{end}}>No Category</option>
+                    {{range .Categories}}
+                        <option value="{{.ID}}" {{if eq .ID $.SelectedCategory}}selected{{end}}>{{.Name}}</option>
+                    {{end}}
+                </select>
+            </div>
+        </div>
+
+        <div class="filter-group" style="margin-top: 15px;">
+            <label>Tags (Select multiple for AND search)</label>
+            <div class="tags-filter-list" style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 5px;">
+                {{range .Tags}}
+                    <label class="tag-checkbox">
+                        <input type="checkbox" name="tag_ids" value="{{.ID}}" 
+                               {{range $.SelectedTags}}{{if eq . $.ID}}checked{{end}}{{end}}>
+                        #{{.Name}}
+                    </label>
+                {{end}}
+            </div>
+        </div>
+    </form>
+
+    <div id="report-results">
+        {{template "report-content" .}}
+    </div>
+</div>
+{{end}}
+
+{{define "report-content"}}
+<div class="report-summary" style="margin-top: 30px; padding: 20px; background: #f9f9f9; border-radius: 8px;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+        <div>
+            <h3>Summary</h3>
+            <p style="font-size: 1.5em; font-weight: bold; margin: 10px 0;">
+                Total Time: <span class="total-duration">{{duration_seconds .Report.TotalSeconds}}</span>
+            </p>
+        </div>
+        
+        <div style="flex-grow: 1; margin-left: 40px;">
+            <h4>Category Breakdown</h4>
+            <div class="breakdown-list">
+                {{range .Report.CategoryBreakdown}}
+                    <div class="breakdown-item" style="margin-bottom: 8px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                            <span>
+                                <span style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: {{.Color}}; margin-right: 5px;"></span>
+                                {{.CategoryName}}
+                            </span>
+                            <span>{{printf "%.1f" .Percentage}}% ({{duration_seconds .TotalSeconds}})</span>
+                        </div>
+                        <div style="width: 100%; height: 8px; background: #eee; border-radius: 4px; overflow: hidden;">
+                            <div style="width: {{.Percentage}}%; height: 100%; background: {{.Color}};"></div>
+                        </div>
+                    </div>
+                {{else}}
+                    <p>No data for this period.</p>
+                {{end}}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="entries-list" style="margin-top: 30px;">
+    <h3>Entries</h3>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Category</th>
+                <th>Description</th>
+                <th>Duration</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range .Report.Entries}}
+                <tr>
+                    <td>{{.StartTime.Format "2006-01-02"}}</td>
+                    <td>
+                        {{if .CategoryID.Valid}}
+                            <span class="badge" style="background-color: {{.CategoryColor.String}}">{{.CategoryName.String}}</span>
+                        {{else}}
+                            <span class="badge badge-secondary">No Category</span>
+                        {{end}}
+                    </td>
+                    <td>{{.Description}}</td>
+                    <td>{{duration .StartTime .EndTime}}</td>
+                </tr>
+            {{else}}
+                <tr>
+                    <td colspan="4" style="text-align: center;">No entries found.</td>
+                </tr>
+            {{end}}
+        </tbody>
+    </table>
+</div>
+{{end}}

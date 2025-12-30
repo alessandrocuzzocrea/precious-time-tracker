@@ -1,4 +1,4 @@
-module github.com/user/precious-time-tracker
+module github.com/alessandrocuzzocrea/precious-time-tracker
 
 go 1.25.5
 
