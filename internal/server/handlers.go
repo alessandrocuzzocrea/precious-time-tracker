@@ -1,12 +1,15 @@
 package server
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"html/template"
 	"log"
 	"net/http"
+	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/user/precious-time-tracker/internal/database"
@@ -15,6 +18,48 @@ import (
 type editData struct {
 	Entry database.TimeEntry
 	Error string
+}
+
+var tagRegex = regexp.MustCompile(`#([a-zA-Z0-9_]+)`)
+
+func parseTags(description string) []string {
+	matches := tagRegex.FindAllStringSubmatch(description, -1)
+	var tags []string
+	seen := make(map[string]bool)
+	for _, match := range matches {
+		if len(match) > 1 {
+			tag := strings.ToLower(match[1])
+			if !seen[tag] {
+				tags = append(tags, tag)
+				seen[tag] = true
+			}
+		}
+	}
+	return tags
+}
+
+func (s *Server) updateTags(ctx context.Context, qxt *database.Queries, entryID int64, tags []string) error {
+	// First clear existing tags for this entry
+	if err := qxt.DeleteTimeEntryTags(ctx, entryID); err != nil {
+		return err
+	}
+
+	for _, tagName := range tags {
+		// Create tag if not exists or get existing
+		tag, err := qxt.CreateTag(ctx, tagName)
+		if err != nil {
+			return err
+		}
+
+		// Link tag to entry
+		if err := qxt.CreateTimeEntryTag(ctx, database.CreateTimeEntryTagParams{
+			TimeEntryID: entryID,
+			TagID:       tag.ID,
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *Server) routes() {
@@ -107,11 +152,18 @@ func (s *Server) handleStartTimer(w http.ResponseWriter, r *http.Request) {
 		description = "No description"
 	}
 
-	// Stop any currently active timer first? Or just forbid?
-	// For simplicity, let's stop any active one.
-	active, err := s.DB.GetActiveTimeEntry(r.Context())
+	tx, err := s.RawDB.Begin()
+	if err != nil {
+		http.Error(w, "Failed to start transaction", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback()
+	qtx := s.DB.WithTx(tx)
+
+	// Stop any currently active timer
+	active, err := qtx.GetActiveTimeEntry(r.Context())
 	if err == nil {
-		if _, err := s.DB.UpdateTimeEntry(r.Context(), database.UpdateTimeEntryParams{
+		if _, err := qtx.UpdateTimeEntry(r.Context(), database.UpdateTimeEntryParams{
 			EndTime: sql.NullTime{Time: time.Now(), Valid: true},
 			ID:      active.ID,
 		}); err != nil {
@@ -119,12 +171,26 @@ func (s *Server) handleStartTimer(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	_, err = s.DB.CreateTimeEntry(r.Context(), database.CreateTimeEntryParams{
+	entry, err := qtx.CreateTimeEntry(r.Context(), database.CreateTimeEntryParams{
 		Description: description,
 		StartTime:   time.Now(),
 	})
 	if err != nil {
 		http.Error(w, "Failed to start timer", http.StatusInternalServerError)
+		return
+	}
+
+	tags := parseTags(description)
+	if err := s.updateTags(r.Context(), qtx, entry.ID, tags); err != nil {
+		log.Printf("Failed to update tags: %v", err)
+		// Continue anyway? Or fail? let's log and continue for now, or maybe return error.
+		// If we fail here, the transaction rolls back, which is good.
+		http.Error(w, "Failed to save tags", http.StatusInternalServerError)
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		http.Error(w, "Failed to commit transaction", http.StatusInternalServerError)
 		return
 	}
 
@@ -252,7 +318,15 @@ func (s *Server) handleUpdateEntry(w http.ResponseWriter, r *http.Request) {
 		endTime = sql.NullTime{Time: et, Valid: true}
 	}
 
-	entry, err := s.DB.UpdateTimeEntryFull(r.Context(), database.UpdateTimeEntryFullParams{
+	tx, err := s.RawDB.Begin()
+	if err != nil {
+		s.render(w, "edit-entry-row", editData{Entry: originalEntry, Error: "Database error"})
+		return
+	}
+	defer tx.Rollback()
+	qtx := s.DB.WithTx(tx)
+
+	entry, err := qtx.UpdateTimeEntryFull(r.Context(), database.UpdateTimeEntryFullParams{
 		Description: description,
 		StartTime:   startTime,
 		EndTime:     endTime,
@@ -260,6 +334,17 @@ func (s *Server) handleUpdateEntry(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		s.render(w, "edit-entry-row", editData{Entry: originalEntry, Error: "Failed to update: " + err.Error()})
+		return
+	}
+
+	tags := parseTags(description)
+	if err := s.updateTags(r.Context(), qtx, entry.ID, tags); err != nil {
+		s.render(w, "edit-entry-row", editData{Entry: originalEntry, Error: "Failed to update tags: " + err.Error()})
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		s.render(w, "edit-entry-row", editData{Entry: originalEntry, Error: "Failed to commit transaction"})
 		return
 	}
 

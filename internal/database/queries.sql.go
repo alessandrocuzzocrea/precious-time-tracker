@@ -11,6 +11,20 @@ import (
 	"time"
 )
 
+const createTag = `-- name: CreateTag :one
+INSERT INTO tags (name)
+VALUES (?)
+ON CONFLICT(name) DO UPDATE SET name=name
+RETURNING id, name
+`
+
+func (q *Queries) CreateTag(ctx context.Context, name string) (Tag, error) {
+	row := q.db.QueryRowContext(ctx, createTag, name)
+	var i Tag
+	err := row.Scan(&i.ID, &i.Name)
+	return i, err
+}
+
 const createTimeEntry = `-- name: CreateTimeEntry :one
 INSERT INTO time_entries (
     description,
@@ -39,6 +53,31 @@ func (q *Queries) CreateTimeEntry(ctx context.Context, arg CreateTimeEntryParams
 	return i, err
 }
 
+const createTimeEntryTag = `-- name: CreateTimeEntryTag :exec
+INSERT INTO time_entry_tags (time_entry_id, tag_id)
+VALUES (?, ?)
+`
+
+type CreateTimeEntryTagParams struct {
+	TimeEntryID int64 `json:"time_entry_id"`
+	TagID       int64 `json:"tag_id"`
+}
+
+func (q *Queries) CreateTimeEntryTag(ctx context.Context, arg CreateTimeEntryTagParams) error {
+	_, err := q.db.ExecContext(ctx, createTimeEntryTag, arg.TimeEntryID, arg.TagID)
+	return err
+}
+
+const deleteTimeEntryTags = `-- name: DeleteTimeEntryTags :exec
+DELETE FROM time_entry_tags
+WHERE time_entry_id = ?
+`
+
+func (q *Queries) DeleteTimeEntryTags(ctx context.Context, timeEntryID int64) error {
+	_, err := q.db.ExecContext(ctx, deleteTimeEntryTags, timeEntryID)
+	return err
+}
+
 const getActiveTimeEntry = `-- name: GetActiveTimeEntry :one
 SELECT id, description, start_time, end_time, created_at FROM time_entries
 WHERE end_time IS NULL
@@ -59,6 +98,18 @@ func (q *Queries) GetActiveTimeEntry(ctx context.Context) (TimeEntry, error) {
 	return i, err
 }
 
+const getTagByName = `-- name: GetTagByName :one
+SELECT id, name FROM tags
+WHERE name = ?
+`
+
+func (q *Queries) GetTagByName(ctx context.Context, name string) (Tag, error) {
+	row := q.db.QueryRowContext(ctx, getTagByName, name)
+	var i Tag
+	err := row.Scan(&i.ID, &i.Name)
+	return i, err
+}
+
 const getTimeEntry = `-- name: GetTimeEntry :one
 SELECT id, description, start_time, end_time, created_at FROM time_entries
 WHERE id = ?
@@ -75,6 +126,35 @@ func (q *Queries) GetTimeEntry(ctx context.Context, id int64) (TimeEntry, error)
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const listTagsForTimeEntry = `-- name: ListTagsForTimeEntry :many
+SELECT t.id, t.name FROM tags t
+JOIN time_entry_tags tet ON t.id = tet.tag_id
+WHERE tet.time_entry_id = ?
+`
+
+func (q *Queries) ListTagsForTimeEntry(ctx context.Context, timeEntryID int64) ([]Tag, error) {
+	rows, err := q.db.QueryContext(ctx, listTagsForTimeEntry, timeEntryID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Tag
+	for rows.Next() {
+		var i Tag
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listTimeEntries = `-- name: ListTimeEntries :many

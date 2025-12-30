@@ -36,7 +36,7 @@ func main() {
 	}
 
 	dbQueries := database.New(db)
-	srv := server.NewServer(dbQueries)
+	srv := server.NewServer(dbQueries, db)
 
 	log.Println("Server starting on :8080")
 	if err := http.ListenAndServe(":8080", srv); err != nil {

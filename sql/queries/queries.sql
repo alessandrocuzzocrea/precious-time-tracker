@@ -33,3 +33,27 @@ RETURNING *;
 -- name: GetTimeEntry :one
 SELECT * FROM time_entries
 WHERE id = ?;
+
+-- name: CreateTag :one
+INSERT INTO tags (name)
+VALUES (?)
+ON CONFLICT(name) DO UPDATE SET name=name
+RETURNING *;
+
+-- name: GetTagByName :one
+SELECT * FROM tags
+WHERE name = ?;
+
+-- name: CreateTimeEntryTag :exec
+INSERT INTO time_entry_tags (time_entry_id, tag_id)
+VALUES (?, ?);
+
+-- name: ListTagsForTimeEntry :many
+SELECT t.* FROM tags t
+JOIN time_entry_tags tet ON t.id = tet.tag_id
+WHERE tet.time_entry_id = ?;
+
+-- name: DeleteTimeEntryTags :exec
+DELETE FROM time_entry_tags
+WHERE time_entry_id = ?;
+

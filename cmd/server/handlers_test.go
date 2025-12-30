@@ -58,7 +58,7 @@ func newTestServer(t *testing.T) *server.Server {
 	}
 
 	dbQueries := database.New(db)
-	return server.NewServer(dbQueries)
+	return server.NewServer(dbQueries, db)
 }
 
 func TestHandleIndex(t *testing.T) {
@@ -187,7 +187,11 @@ func TestHandleEditAndUpdate(t *testing.T) {
 		t.Errorf("expected status 200, got %d", w.Result().StatusCode)
 	}
 	if !strings.Contains(w.Body.String(), "New Description") {
-		t.Errorf("expected response to contain new description")
+		body := w.Body.String()
+		if len(body) > 200 {
+			body = body[:200] + "..."
+		}
+		t.Errorf("expected response to contain new description, got: %s", body)
 	}
 
 	// Verify DB
