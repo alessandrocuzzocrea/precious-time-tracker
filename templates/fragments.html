@@ -107,10 +107,16 @@
                         {{.Status}}
                     </span>
                 </td>
-                <td>{{.Category}}</td>
-                <td>{{.Description}}</td>
-                <td>{{.StartTime.Format "Jan 02 15:04:05"}}</td>
-                <td>{{if .EndTime.Valid}}{{.EndTime.Time.Format "15:04:05"}}{{else}}-{{end}}</td>
+                <td>{{if .CategoryChanged}}<strong>{{.Category}}</strong>{{else}}{{.Category}}{{end}}</td>
+                <td>{{if .DescriptionChanged}}<strong>{{.Description}}</strong>{{else}}{{.Description}}{{end}}</td>
+                <td>{{if .StartTimeChanged}}<strong>{{.StartTime.Format "Jan 02 15:04:05"}}</strong>{{else}}{{.StartTime.Format "Jan 02 15:04:05"}}{{end}}</td>
+                <td>
+                    {{if .EndTime.Valid}}
+                        {{if .EndTimeChanged}}<strong>{{.EndTime.Time.Format "15:04:05"}}</strong>{{else}}{{.EndTime.Time.Format "15:04:05"}}{{end}}
+                    {{else}}
+                        -
+                    {{end}}
+                </td>
             </tr>
             {{end}}
         </tbody>

@@ -256,6 +256,11 @@ type CSVPreviewEntry struct {
 	EndTime     sql.NullTime
 	Category    string
 	Status      string // "New" or "Updated"
+
+	DescriptionChanged bool
+	StartTimeChanged   bool
+	EndTimeChanged     bool
+	CategoryChanged    bool
 }
 
 func (s *Service) GetReport(ctx context.Context, filter ReportFilter) (ReportData, error) {
@@ -548,20 +553,22 @@ func (s *Service) PreviewCSV(ctx context.Context, r io.Reader) ([]CSVPreviewEntr
 
 		id, _ := strconv.ParseInt(idStr, 10, 64)
 		status := "New"
+		var descChanged, startChanged, endChanged, catChanged bool
+
 		if id > 0 {
 			existing, err := s.db.GetTimeEntry(ctx, id)
 			if err == nil {
 				// Compare all fields to see if anything actually changed
-				descMatch := existing.Description == description
-				startMatch := existing.StartTime.Equal(startTime)
-				endMatch := (existing.EndTime.Valid == endTime.Valid)
-				if endMatch && existing.EndTime.Valid {
-					endMatch = existing.EndTime.Time.Equal(endTime.Time)
+				descChanged = existing.Description != description
+				startChanged = !existing.StartTime.Equal(startTime)
+				endChanged = (existing.EndTime.Valid != endTime.Valid)
+				if !endChanged && existing.EndTime.Valid {
+					endChanged = !existing.EndTime.Time.Equal(endTime.Time)
 				}
-				catMatch := (existing.CategoryName.Valid && existing.CategoryName.String == categoryName) ||
-					(!existing.CategoryName.Valid && categoryName == "")
+				catChanged = !((existing.CategoryName.Valid && existing.CategoryName.String == categoryName) ||
+					(!existing.CategoryName.Valid && categoryName == ""))
 
-				if descMatch && startMatch && endMatch && catMatch {
+				if !descChanged && !startChanged && !endChanged && !catChanged {
 					continue // No changes, skip from preview
 				}
 				status = "Updated"
@@ -569,12 +576,16 @@ func (s *Service) PreviewCSV(ctx context.Context, r io.Reader) ([]CSVPreviewEntr
 		}
 
 		preview = append(preview, CSVPreviewEntry{
-			ID:          id,
-			Description: description,
-			StartTime:   startTime,
-			EndTime:     endTime,
-			Category:    categoryName,
-			Status:      status,
+			ID:                 id,
+			Description:        description,
+			StartTime:          startTime,
+			EndTime:            endTime,
+			Category:           categoryName,
+			Status:             status,
+			DescriptionChanged: descChanged,
+			StartTimeChanged:   startChanged,
+			EndTimeChanged:     endChanged,
+			CategoryChanged:    catChanged,
 		})
 	}
 
