@@ -150,6 +150,34 @@ func (q *Queries) GetTimeEntry(ctx context.Context, id int64) (TimeEntry, error)
 	return i, err
 }
 
+const listTags = `-- name: ListTags :many
+SELECT id, name FROM tags
+ORDER BY name
+`
+
+func (q *Queries) ListTags(ctx context.Context) ([]Tag, error) {
+	rows, err := q.db.QueryContext(ctx, listTags)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Tag
+	for rows.Next() {
+		var i Tag
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTagsForTimeEntry = `-- name: ListTagsForTimeEntry :many
 SELECT t.id, t.name FROM tags t
 JOIN time_entry_tags tet ON t.id = tet.tag_id

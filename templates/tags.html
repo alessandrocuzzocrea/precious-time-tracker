@@ -1,0 +1,19 @@
+{{define "content"}}
+<div class="tags-page">
+    <h2>All Tags</h2>
+    <div class="tags-list">
+        {{if .}}
+            <ul>
+                {{range .}}
+                    <li>#{{.Name}}</li>
+                {{end}}
+            </ul>
+        {{else}}
+            <p>No tags found.</p>
+        {{end}}
+    </div>
+    <div style="margin-top: 20px;">
+        <a href="/" class="btn">Back to Tracker</a>
+    </div>
+</div>
+{{end}}

@@ -77,6 +77,7 @@ func (s *Server) routes() {
 	s.Router.HandleFunc("POST /stop", s.handleStopTimer)
 	s.Router.HandleFunc("GET /entry/{id}", s.handleGetEntry)
 	s.Router.HandleFunc("GET /entry/{id}/edit", s.handleEditEntry)
+	s.Router.HandleFunc("GET /tags", s.handleListTags)
 	s.Router.HandleFunc("PUT /entry/{id}", s.handleUpdateEntry)
 	s.Router.HandleFunc("DELETE /entry/{id}", s.handleDeleteEntry)
 	s.Router.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
@@ -382,4 +383,15 @@ func (s *Server) handleDeleteEntry(w http.ResponseWriter, r *http.Request) {
 
 	// Return empty string to remove the element from DOM or status 200
 	w.WriteHeader(http.StatusOK)
+}
+
+func (s *Server) handleListTags(w http.ResponseWriter, r *http.Request) {
+	tags, err := s.DB.ListTags(r.Context())
+	if err != nil {
+		log.Printf("Error listing tags: %v", err)
+		http.Error(w, "Failed to list tags", http.StatusInternalServerError)
+		return
+	}
+
+	s.render(w, "", tags, "templates/base.html", "templates/tags.html")
 }

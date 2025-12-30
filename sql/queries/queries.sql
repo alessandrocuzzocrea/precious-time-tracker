@@ -67,3 +67,7 @@ DELETE FROM tags
 WHERE NOT EXISTS (
     SELECT 1 FROM time_entry_tags WHERE tag_id = tags.id
 );
+
+-- name: ListTags :many
+SELECT * FROM tags
+ORDER BY name;
