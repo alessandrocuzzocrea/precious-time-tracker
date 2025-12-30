@@ -62,7 +62,6 @@ func TestStartAndStopTimer(t *testing.T) {
 	}
 
 	// 2. Start another timer (should stop the first one)
-	startTime2 := time.Now()
 	entry2, err := svc.StartTimer(ctx, "Second Task")
 	if err != nil {
 		t.Fatalf("StartTimer 2 failed: %v", err)
@@ -75,9 +74,6 @@ func TestStartAndStopTimer(t *testing.T) {
 	}
 	if !oldEntry.EndTime.Valid {
 		t.Errorf("expected first entry to be stopped")
-	}
-	if oldEntry.EndTime.Time.Before(startTime2) && !oldEntry.EndTime.Time.Equal(startTime2) {
-		// This is a bit flaky with time.Now() but should be roughly correct
 	}
 
 	// 3. Stop running timer

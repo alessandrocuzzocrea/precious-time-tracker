@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"regexp"
 	"strings"
 	"time"
@@ -105,7 +106,7 @@ func (s *Service) StartTimer(ctx context.Context, description string) (*database
 			EndTime: sql.NullTime{Time: time.Now(), Valid: true},
 			ID:      active.ID,
 		}); err != nil {
-			// Log?
+			log.Printf("Failed to stop previous active timer (ID %d): %v", active.ID, err)
 		}
 	}
 
