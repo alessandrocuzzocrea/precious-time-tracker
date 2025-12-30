@@ -209,3 +209,46 @@ func TestHandleEditAndUpdate(t *testing.T) {
 		t.Errorf("expected description 'New Description', got %s", updated.Description)
 	}
 }
+
+func TestHandleUpdateActiveEntry(t *testing.T) {
+	srv := newTestServer(t)
+	ctx := context.Background()
+
+	// 1. Create a category
+	cat, err := srv.Service.CreateCategory(ctx, "Test Cat", "#ff0000")
+	if err != nil {
+		t.Fatalf("failed to create category: %v", err)
+	}
+
+	// 2. Start a timer
+	_, err = srv.Service.StartTimer(ctx, "Initial Description", nil)
+	if err != nil {
+		t.Fatalf("failed to start timer: %v", err)
+	}
+
+	// 3. Update it via PATCH /entry/active
+	form := url.Values{}
+	form.Add("description", "Updated Live Description")
+	form.Add("category_id", fmt.Sprintf("%d", cat.ID))
+
+	req := httptest.NewRequest("PATCH", "/entry/active", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+
+	if w.Result().StatusCode != http.StatusOK {
+		t.Errorf("expected status 200, got %d", w.Result().StatusCode)
+	}
+
+	// 4. Verify DB
+	active, err := srv.Service.GetActiveTimeEntry(ctx)
+	if err != nil {
+		t.Fatalf("failed to get active entry: %v", err)
+	}
+	if active.Description != "Updated Live Description" {
+		t.Errorf("expected description 'Updated Live Description', got %s", active.Description)
+	}
+	if !active.CategoryID.Valid || active.CategoryID.Int64 != cat.ID {
+		t.Errorf("expected category ID %d, got %v", cat.ID, active.CategoryID)
+	}
+}

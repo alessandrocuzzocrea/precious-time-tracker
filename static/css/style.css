@@ -171,6 +171,36 @@ th {
     color: white;
 }
 
+.sticky-select-small {
+    padding: 4px 8px;
+    font-size: 0.8rem;
+    height: 32px;
+}
+
+.sticky-input-active {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 4px 8px;
+    color: white;
+    font-size: 0.95rem;
+    font-weight: bold;
+    flex-grow: 1;
+    transition: all 0.2s ease;
+}
+
+.sticky-input-active:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.sticky-input-active:focus {
+    outline: none;
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.4);
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.05);
+}
+
 .category-form label {
     display: block;
     font-size: 0.85rem;

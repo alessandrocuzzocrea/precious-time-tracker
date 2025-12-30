@@ -30,6 +30,7 @@ func (s *Server) routes() {
 	s.Router.HandleFunc("POST /categories/{id}", s.handleUpdateCategory)
 	s.Router.HandleFunc("DELETE /categories/{id}", s.handleDeleteCategory)
 	s.Router.HandleFunc("PUT /entry/{id}", s.handleUpdateEntry)
+	s.Router.HandleFunc("PATCH /entry/active", s.handleUpdateActiveEntry)
 	s.Router.HandleFunc("DELETE /entry/{id}", s.handleDeleteEntry)
 	s.Router.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 }
@@ -132,6 +133,35 @@ func (s *Server) handleStartTimer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+func (s *Server) handleUpdateActiveEntry(w http.ResponseWriter, r *http.Request) {
+	active, err := s.Service.GetActiveTimeEntry(r.Context())
+	if err != nil {
+		log.Printf("Error getting active entry: %v", err)
+		http.Error(w, "No active entry", http.StatusNotFound)
+		return
+	}
+
+	description := r.FormValue("description")
+	categoryIDStr := r.FormValue("category_id")
+
+	var categoryID *int64
+	if categoryIDStr != "" {
+		id, err := strconv.ParseInt(categoryIDStr, 10, 64)
+		if err == nil {
+			categoryID = &id
+		}
+	}
+
+	_, err = s.Service.UpdateTimeEntry(r.Context(), active.ID, description, active.StartTime, active.EndTime, categoryID)
+	if err != nil {
+		log.Printf("Error updating active entry: %v", err)
+		http.Error(w, "Failed to update", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
 func (s *Server) handleStopTimer(w http.ResponseWriter, r *http.Request) {

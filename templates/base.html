@@ -13,7 +13,16 @@
         <div class="sticky-bar-content">
             {{if .Active}}
                 <div class="tracking-info">
-                    <span class="sticky-description">Tracking: <strong>{{.Active.Description}}</strong></span>
+                    <form hx-patch="/entry/active" hx-trigger="change from:select, keyup delay:500ms changed from:input" hx-swap="none" style="display: flex; gap: 10px; align-items: center; flex-grow: 1;">
+                        <select name="category_id" class="sticky-select sticky-select-small">
+                            <option value="">No Category</option>
+                            {{$activeCatID := .Active.CategoryID.Int64}}
+                            {{range .Categories}}
+                                <option value="{{.ID}}" {{if eq .ID $activeCatID}}selected{{end}}>{{.Name}}</option>
+                            {{end}}
+                        </select>
+                        <input type="text" name="description" value="{{.Active.Description}}" class="sticky-input-active" placeholder="Description...">
+                    </form>
                     <span class="sticky-duration-container">Duration: <span id="sticky-duration">0s</span></span>
                 </div>
                 <form action="/stop" method="POST" style="margin: 0;">
