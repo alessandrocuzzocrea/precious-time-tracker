@@ -1,23 +1,20 @@
 package server
 
 import (
-	"database/sql"
 	"net/http"
 
-	"github.com/user/precious-time-tracker/internal/database"
+	"github.com/user/precious-time-tracker/internal/service"
 )
 
 type Server struct {
-	DB     *database.Queries
-	RawDB  *sql.DB
-	Router *http.ServeMux
+	Service *service.Service
+	Router  *http.ServeMux
 }
 
-func NewServer(db *database.Queries, rawDB *sql.DB) *Server {
+func NewServer(svc *service.Service) *Server {
 	s := &Server{
-		DB:     db,
-		RawDB:  rawDB,
-		Router: http.NewServeMux(),
+		Service: svc,
+		Router:  http.NewServeMux(),
 	}
 	s.routes()
 	return s

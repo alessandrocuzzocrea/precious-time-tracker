@@ -8,6 +8,7 @@ import (
 	"github.com/pressly/goose/v3"
 	"github.com/user/precious-time-tracker/internal/database"
 	"github.com/user/precious-time-tracker/internal/server"
+	"github.com/user/precious-time-tracker/internal/service"
 	"github.com/user/precious-time-tracker/sql/schema"
 	_ "modernc.org/sqlite"
 )
@@ -40,7 +41,8 @@ func main() {
 	}
 
 	dbQueries := database.New(db)
-	srv := server.NewServer(dbQueries, db)
+	svc := service.New(dbQueries, db)
+	srv := server.NewServer(svc)
 
 	log.Println("Server starting on :8080")
 	if err := http.ListenAndServe(":8080", srv); err != nil {

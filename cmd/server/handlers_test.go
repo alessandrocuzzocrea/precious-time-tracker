@@ -11,11 +11,11 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/pressly/goose/v3"
 	"github.com/user/precious-time-tracker/internal/database"
 	"github.com/user/precious-time-tracker/internal/server"
+	"github.com/user/precious-time-tracker/internal/service"
 	"github.com/user/precious-time-tracker/sql/schema"
 
 	_ "modernc.org/sqlite"
@@ -58,7 +58,8 @@ func newTestServer(t *testing.T) *server.Server {
 	}
 
 	dbQueries := database.New(db)
-	return server.NewServer(dbQueries, db)
+	svc := service.New(dbQueries, db)
+	return server.NewServer(svc)
 }
 
 func TestHandleIndex(t *testing.T) {
@@ -127,7 +128,7 @@ func TestHandleStartTimer(t *testing.T) {
 
 	// Verify DB
 	ctx := context.Background()
-	active, err := srv.DB.GetActiveTimeEntry(ctx)
+	active, err := srv.Service.GetActiveTimeEntry(ctx)
 	if err != nil {
 		t.Fatalf("failed to get active entry: %v", err)
 	}
@@ -155,13 +156,12 @@ func TestHandleEditAndUpdate(t *testing.T) {
 
 	// Create an entry
 	ctx := context.Background()
-	entry, err := srv.DB.CreateTimeEntry(ctx, database.CreateTimeEntryParams{
-		Description: "Old Description",
-		StartTime:   time.Now(),
-	})
+	entry, err := srv.Service.StartTimer(ctx, "Old Description")
 	if err != nil {
 		t.Fatalf("failed to create entry: %v", err)
 	}
+	// Stop it to make it a past entry? Or just edit running? Test edits existing.
+	// Update works on ID.
 
 	// 1. GET /entry/{id}/edit -> Should return the form
 	req := httptest.NewRequest("GET", "/entry/"+fmt.Sprintf("%d", entry.ID)+"/edit", nil)
@@ -178,6 +178,12 @@ func TestHandleEditAndUpdate(t *testing.T) {
 	// 2. PUT /entry/{id} -> Should update description
 	form := url.Values{}
 	form.Add("description", "New Description")
+	// Must provide start_time as form requires parsing it back, usually hidden input or preserved.
+	// The handler expects start_time logic.
+	// If I don't provide start_time in form, handler fails "Invalid start time format".
+	// Test needs to simulate full form submission.
+	form.Add("start_time", entry.StartTime.Format("2006-01-02T15:04:05"))
+
 	req = httptest.NewRequest("PUT", "/entry/"+fmt.Sprintf("%d", entry.ID), strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	w = httptest.NewRecorder()
@@ -195,7 +201,7 @@ func TestHandleEditAndUpdate(t *testing.T) {
 	}
 
 	// Verify DB
-	updated, err := srv.DB.GetTimeEntry(ctx, entry.ID)
+	updated, err := srv.Service.GetTimeEntry(ctx, entry.ID)
 	if err != nil {
 		t.Fatalf("failed to get entry: %v", err)
 	}
