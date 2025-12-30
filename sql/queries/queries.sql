@@ -115,3 +115,41 @@ AND (
     OR (sqlc.arg('category_filter') = -1 AND te.category_id IS NULL)
 )
 ORDER BY te.start_time DESC;
+
+-- name: ListAllTimeEntries :many
+SELECT te.*, c.name as category_name, c.color as category_color 
+FROM time_entries te
+LEFT JOIN categories c ON te.category_id = c.id
+ORDER BY te.start_time DESC;
+
+-- name: GetCategoryByName :one
+SELECT * FROM categories
+WHERE name = ?;
+
+-- name: UpsertTimeEntry :one
+INSERT INTO time_entries (
+    id,
+    description,
+    start_time,
+    end_time,
+    category_id
+) VALUES (
+    ?, ?, ?, ?, ?
+)
+ON CONFLICT(id) DO UPDATE SET
+    description = excluded.description,
+    start_time = excluded.start_time,
+    end_time = excluded.end_time,
+    category_id = excluded.category_id
+RETURNING *;
+
+-- name: CreateTimeEntryFull :one
+INSERT INTO time_entries (
+    description,
+    start_time,
+    end_time,
+    category_id
+) VALUES (
+    ?, ?, ?, ?
+)
+RETURNING *;

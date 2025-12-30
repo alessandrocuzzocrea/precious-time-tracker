@@ -34,6 +34,9 @@ func (s *Server) routes() {
 	s.Router.HandleFunc("PUT /entry/{id}", s.handleUpdateEntry)
 	s.Router.HandleFunc("PATCH /entry/active", s.handleUpdateActiveEntry)
 	s.Router.HandleFunc("DELETE /entry/{id}", s.handleDeleteEntry)
+	s.Router.HandleFunc("GET /data", s.handleDataPage)
+	s.Router.HandleFunc("GET /export", s.handleExportCSV)
+	s.Router.HandleFunc("POST /import", s.handleImportCSV)
 	s.Router.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 }
 
@@ -474,4 +477,37 @@ func (s *Server) handleDeleteCategory(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func (s *Server) handleDataPage(w http.ResponseWriter, r *http.Request) {
+	data := map[string]interface{}{
+		"Success": r.URL.Query().Get("success") == "1",
+	}
+	s.render(w, r, "", data, "templates/base.html", "templates/data.html")
+}
+
+func (s *Server) handleExportCSV(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/csv")
+	w.Header().Set("Content-Disposition", "attachment;filename=time-entries.csv")
+	if err := s.Service.ExportCSV(r.Context(), w); err != nil {
+		log.Printf("Export error: %v", err)
+		// Can't really send error after headers, but we can try
+	}
+}
+
+func (s *Server) handleImportCSV(w http.ResponseWriter, r *http.Request) {
+	file, _, err := r.FormFile("csv_file")
+	if err != nil {
+		http.Error(w, "Failed to get file", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	if err := s.Service.ImportCSV(r.Context(), file); err != nil {
+		log.Printf("Import error: %v", err)
+		http.Error(w, "Import failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, "/data?success=1", http.StatusSeeOther)
 }

@@ -3,9 +3,12 @@ package service
 import (
 	"context"
 	"database/sql"
+	"encoding/csv"
 	"fmt"
+	"io"
 	"log"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -335,4 +338,173 @@ func (s *Service) GetReport(ctx context.Context, filter ReportFilter) (ReportDat
 		CategoryBreakdown: breakdown,
 		Filter:            filter,
 	}, nil
+}
+
+func (s *Service) ExportCSV(ctx context.Context, w io.Writer) error {
+	entries, err := s.db.ListAllTimeEntries(ctx)
+	if err != nil {
+		return err
+	}
+
+	writer := csv.NewWriter(w)
+	defer writer.Flush()
+
+	// Header
+	if err := writer.Write([]string{"id", "description", "start_time", "end_time", "category"}); err != nil {
+		return err
+	}
+
+	for _, e := range entries {
+		startTime := e.StartTime.Format(time.RFC3339)
+		endTime := ""
+		if e.EndTime.Valid {
+			endTime = e.EndTime.Time.Format(time.RFC3339)
+		}
+		category := ""
+		if e.CategoryName.Valid {
+			category = e.CategoryName.String
+		}
+
+		if err := writer.Write([]string{
+			strconv.FormatInt(e.ID, 10),
+			e.Description,
+			startTime,
+			endTime,
+			category,
+		}); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s *Service) ImportCSV(ctx context.Context, r io.Reader) error {
+	reader := csv.NewReader(r)
+	records, err := reader.ReadAll()
+	if err != nil {
+		return err
+	}
+
+	if len(records) < 2 {
+		return nil // Only header or empty
+	}
+
+	header := records[0]
+	colMap := make(map[string]int)
+	for i, h := range header {
+		colMap[strings.ToLower(strings.TrimSpace(h))] = i
+	}
+
+	tx, err := s.rawDB.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	qtx := s.db.WithTx(tx)
+
+	for _, record := range records[1:] {
+		// Helper to get col value
+		getVal := func(name string) string {
+			if idx, ok := colMap[name]; ok && idx < len(record) {
+				return strings.TrimSpace(record[idx])
+			}
+			return ""
+		}
+
+		idStr := getVal("id")
+		description := getVal("description")
+		startTimeStr := getVal("start_time")
+		endTimeStr := getVal("end_time")
+		categoryName := getVal("category")
+
+		if description == "" && startTimeStr == "" {
+			continue // Skip empty rows
+		}
+
+		startTime, err := parseFlexTime(startTimeStr)
+		if err != nil {
+			return fmt.Errorf("invalid start_time '%s': %w", startTimeStr, err)
+		}
+
+		var endTime sql.NullTime
+		if endTimeStr != "" {
+			et, err := parseFlexTime(endTimeStr)
+			if err != nil {
+				return fmt.Errorf("invalid end_time '%s': %w", endTimeStr, err)
+			}
+			endTime = sql.NullTime{Time: et, Valid: true}
+		}
+
+		var catID sql.NullInt64
+		if categoryName != "" {
+			cat, err := qtx.GetCategoryByName(ctx, categoryName)
+			if err == sql.ErrNoRows {
+				// Create category
+				cat, err = qtx.CreateCategory(ctx, database.CreateCategoryParams{
+					Name:  categoryName,
+					Color: "#cccccc",
+				})
+				if err != nil {
+					return fmt.Errorf("failed to create category '%s': %w", categoryName, err)
+				}
+			} else if err != nil {
+				return err
+			}
+			catID = sql.NullInt64{Int64: cat.ID, Valid: true}
+		}
+
+		var entry database.TimeEntry
+		id, _ := strconv.ParseInt(idStr, 10, 64)
+		if id > 0 {
+			entry, err = qtx.UpsertTimeEntry(ctx, database.UpsertTimeEntryParams{
+				ID:          id,
+				Description: description,
+				StartTime:   startTime,
+				EndTime:     endTime,
+				CategoryID:  catID,
+			})
+		} else {
+			entry, err = qtx.CreateTimeEntryFull(ctx, database.CreateTimeEntryFullParams{
+				Description: description,
+				StartTime:   startTime,
+				EndTime:     endTime,
+				CategoryID:  catID,
+			})
+		}
+
+		if err != nil {
+			return fmt.Errorf("failed to save entry: %w", err)
+		}
+
+		// Update tags
+		tags := parseTags(description)
+		if err := s.updateTags(ctx, qtx, entry.ID, tags); err != nil {
+			return fmt.Errorf("failed to update tags for entry %d: %w", entry.ID, err)
+		}
+	}
+
+	return tx.Commit()
+}
+
+func parseFlexTime(s string) (time.Time, error) {
+	formats := []string{
+		time.RFC3339,
+		"2006-01-02 15:04:05",
+		"2006-01-02T15:04:05",
+		"2006-01-02 15:04",
+		"2006-01-02",
+	}
+	for _, f := range formats {
+		t, err := time.Parse(f, s)
+		if err == nil {
+			return t, nil
+		}
+		// Try with local location
+		t, err = time.ParseInLocation(f, s, time.Local)
+		if err == nil {
+			return t, nil
+		}
+	}
+	return time.Time{}, fmt.Errorf("unsupported time format")
 }

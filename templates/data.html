@@ -1,0 +1,30 @@
+{{define "content"}}
+<div class="data-page">
+    <h2>Data Management</h2>
+    
+    <div class="card" style="margin-bottom: 20px; padding: 20px; border: 1px solid #ddd; border-radius: 8px;">
+        <h3>Export Data</h3>
+        <p>Download all your time entries as a CSV file.</p>
+        <a href="/export" class="btn btn-start">Download CSV</a>
+    </div>
+
+    <div class="card" style="padding: 20px; border: 1px solid #ddd; border-radius: 8px;">
+        <h3>Import Data</h3>
+        <p>Upload a CSV file to import time entries. The CSV should have headers: <code>id, description, start_time, end_time, category</code>.</p>
+        <p><small>If an ID is provided and exists, the entry will be updated. If the ID is missing, a new entry will be created.</small></p>
+        
+        <form action="/import" method="POST" enctype="multipart/form-data" style="margin-top: 15px;">
+            <div style="margin-bottom: 10px;">
+                <input type="file" name="csv_file" accept=".csv" required>
+            </div>
+            <button type="submit" class="btn btn-start">Upload and Import</button>
+        </form>
+
+        {{if .Success}}
+            <div style="margin-top: 15px; color: green; font-weight: bold;">
+                Import completed successfully!
+            </div>
+        {{end}}
+    </div>
+</div>
+{{end}}

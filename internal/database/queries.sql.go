@@ -79,6 +79,44 @@ func (q *Queries) CreateTimeEntry(ctx context.Context, arg CreateTimeEntryParams
 	return i, err
 }
 
+const createTimeEntryFull = `-- name: CreateTimeEntryFull :one
+INSERT INTO time_entries (
+    description,
+    start_time,
+    end_time,
+    category_id
+) VALUES (
+    ?, ?, ?, ?
+)
+RETURNING id, description, start_time, end_time, created_at, category_id
+`
+
+type CreateTimeEntryFullParams struct {
+	Description string        `json:"description"`
+	StartTime   time.Time     `json:"start_time"`
+	EndTime     sql.NullTime  `json:"end_time"`
+	CategoryID  sql.NullInt64 `json:"category_id"`
+}
+
+func (q *Queries) CreateTimeEntryFull(ctx context.Context, arg CreateTimeEntryFullParams) (TimeEntry, error) {
+	row := q.db.QueryRowContext(ctx, createTimeEntryFull,
+		arg.Description,
+		arg.StartTime,
+		arg.EndTime,
+		arg.CategoryID,
+	)
+	var i TimeEntry
+	err := row.Scan(
+		&i.ID,
+		&i.Description,
+		&i.StartTime,
+		&i.EndTime,
+		&i.CreatedAt,
+		&i.CategoryID,
+	)
+	return i, err
+}
+
 const createTimeEntryTag = `-- name: CreateTimeEntryTag :exec
 INSERT INTO time_entry_tags (time_entry_id, tag_id)
 VALUES (?, ?)
@@ -189,6 +227,23 @@ func (q *Queries) GetCategory(ctx context.Context, id int64) (Category, error) {
 	return i, err
 }
 
+const getCategoryByName = `-- name: GetCategoryByName :one
+SELECT id, name, color, created_at FROM categories
+WHERE name = ?
+`
+
+func (q *Queries) GetCategoryByName(ctx context.Context, name string) (Category, error) {
+	row := q.db.QueryRowContext(ctx, getCategoryByName, name)
+	var i Category
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Color,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const getTagByName = `-- name: GetTagByName :one
 SELECT id, name FROM tags
 WHERE name = ?
@@ -233,6 +288,56 @@ func (q *Queries) GetTimeEntry(ctx context.Context, id int64) (GetTimeEntryRow, 
 		&i.CategoryColor,
 	)
 	return i, err
+}
+
+const listAllTimeEntries = `-- name: ListAllTimeEntries :many
+SELECT te.id, te.description, te.start_time, te.end_time, te.created_at, te.category_id, c.name as category_name, c.color as category_color 
+FROM time_entries te
+LEFT JOIN categories c ON te.category_id = c.id
+ORDER BY te.start_time DESC
+`
+
+type ListAllTimeEntriesRow struct {
+	ID            int64          `json:"id"`
+	Description   string         `json:"description"`
+	StartTime     time.Time      `json:"start_time"`
+	EndTime       sql.NullTime   `json:"end_time"`
+	CreatedAt     time.Time      `json:"created_at"`
+	CategoryID    sql.NullInt64  `json:"category_id"`
+	CategoryName  sql.NullString `json:"category_name"`
+	CategoryColor sql.NullString `json:"category_color"`
+}
+
+func (q *Queries) ListAllTimeEntries(ctx context.Context) ([]ListAllTimeEntriesRow, error) {
+	rows, err := q.db.QueryContext(ctx, listAllTimeEntries)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAllTimeEntriesRow
+	for rows.Next() {
+		var i ListAllTimeEntriesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Description,
+			&i.StartTime,
+			&i.EndTime,
+			&i.CreatedAt,
+			&i.CategoryID,
+			&i.CategoryName,
+			&i.CategoryColor,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listCategories = `-- name: ListCategories :many
@@ -514,6 +619,52 @@ func (q *Queries) UpdateTimeEntryFull(ctx context.Context, arg UpdateTimeEntryFu
 		arg.EndTime,
 		arg.CategoryID,
 		arg.ID,
+	)
+	var i TimeEntry
+	err := row.Scan(
+		&i.ID,
+		&i.Description,
+		&i.StartTime,
+		&i.EndTime,
+		&i.CreatedAt,
+		&i.CategoryID,
+	)
+	return i, err
+}
+
+const upsertTimeEntry = `-- name: UpsertTimeEntry :one
+INSERT INTO time_entries (
+    id,
+    description,
+    start_time,
+    end_time,
+    category_id
+) VALUES (
+    ?, ?, ?, ?, ?
+)
+ON CONFLICT(id) DO UPDATE SET
+    description = excluded.description,
+    start_time = excluded.start_time,
+    end_time = excluded.end_time,
+    category_id = excluded.category_id
+RETURNING id, description, start_time, end_time, created_at, category_id
+`
+
+type UpsertTimeEntryParams struct {
+	ID          int64         `json:"id"`
+	Description string        `json:"description"`
+	StartTime   time.Time     `json:"start_time"`
+	EndTime     sql.NullTime  `json:"end_time"`
+	CategoryID  sql.NullInt64 `json:"category_id"`
+}
+
+func (q *Queries) UpsertTimeEntry(ctx context.Context, arg UpsertTimeEntryParams) (TimeEntry, error) {
+	row := q.db.QueryRowContext(ctx, upsertTimeEntry,
+		arg.ID,
+		arg.Description,
+		arg.StartTime,
+		arg.EndTime,
+		arg.CategoryID,
 	)
 	var i TimeEntry
 	err := row.Scan(
