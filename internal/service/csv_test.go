@@ -68,7 +68,9 @@ func TestPreviewCSV(t *testing.T) {
 
 	// 1. Create existing entry
 	entry, _ := svc.StartTimer(ctx, "Existing", nil)
-	svc.StopTimer(ctx) // creates valid end time
+	if err := svc.StopTimer(ctx); err != nil {
+		t.Fatalf("StopTimer failed: %v", err)
+	} // creates valid end time
 	// Refetch to get the updated EndTime
 	updated, _ := svc.GetTimeEntry(ctx, entry.ID)
 	entry = &updated
@@ -129,7 +131,9 @@ func TestImportCSV(t *testing.T) {
 
 	cat, _ := svc.CreateCategory(ctx, "ExistingCat", "#000000")
 	entry, _ := svc.StartTimer(ctx, "Old Msg", &cat.ID)
-	svc.StopTimer(ctx) // Ensure valid end time
+	if err := svc.StopTimer(ctx); err != nil {
+		t.Fatalf("StopTimer failed: %v", err)
+	} // Ensure valid end time
 
 	// Update the fetched entry to match DB state for precise time formatting
 	entryFromDB, _ := svc.GetTimeEntry(ctx, entry.ID)

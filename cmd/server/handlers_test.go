@@ -258,8 +258,14 @@ func TestHandleUpdateActiveEntry(t *testing.T) {
 func TestHandleLists(t *testing.T) {
 	root, _ := getProjectRoot()
 	oldWd, _ := os.Getwd()
-	os.Chdir(root)
-	defer os.Chdir(oldWd)
+	if err := os.Chdir(root); err != nil {
+		t.Fatalf("failed to chdir to root: %v", err)
+	}
+	defer func() {
+		if err := os.Chdir(oldWd); err != nil {
+			t.Errorf("failed to restore wd: %v", err)
+		}
+	}()
 
 	srv := newTestServer(t)
 
@@ -283,8 +289,14 @@ func TestHandleLists(t *testing.T) {
 func TestHandleReports(t *testing.T) {
 	root, _ := getProjectRoot()
 	oldWd, _ := os.Getwd()
-	os.Chdir(root)
-	defer os.Chdir(oldWd)
+	if err := os.Chdir(root); err != nil {
+		t.Fatalf("failed to chdir to root: %v", err)
+	}
+	defer func() {
+		if err := os.Chdir(oldWd); err != nil {
+			t.Errorf("failed to restore wd: %v", err)
+		}
+	}()
 
 	srv := newTestServer(t)
 
@@ -303,8 +315,14 @@ func TestHandleReports(t *testing.T) {
 func TestHandleDataPageAndExport(t *testing.T) {
 	root, _ := getProjectRoot()
 	oldWd, _ := os.Getwd()
-	os.Chdir(root)
-	defer os.Chdir(oldWd)
+	if err := os.Chdir(root); err != nil {
+		t.Fatalf("failed to chdir to root: %v", err)
+	}
+	defer func() {
+		if err := os.Chdir(oldWd); err != nil {
+			t.Errorf("failed to restore wd: %v", err)
+		}
+	}()
 
 	srv := newTestServer(t)
 
@@ -331,8 +349,14 @@ func TestHandleDataPageAndExport(t *testing.T) {
 func TestHandleImportPreview(t *testing.T) {
 	root, _ := getProjectRoot()
 	oldWd, _ := os.Getwd()
-	os.Chdir(root)
-	defer os.Chdir(oldWd)
+	if err := os.Chdir(root); err != nil {
+		t.Fatalf("failed to chdir to root: %v", err)
+	}
+	defer func() {
+		if err := os.Chdir(oldWd); err != nil {
+			t.Errorf("failed to restore wd: %v", err)
+		}
+	}()
 
 	srv := newTestServer(t)
 
@@ -340,8 +364,12 @@ func TestHandleImportPreview(t *testing.T) {
 	var b bytes.Buffer
 	w := multipart.NewWriter(&b)
 	fw, _ := w.CreateFormFile("csv_file", "test.csv")
-	fw.Write([]byte("id,description,start_time,end_time,category\n,Test Item,2024-01-01T10:00:00Z,,Work"))
-	w.Close()
+	if _, err := fw.Write([]byte("id,description,start_time,end_time,category\n,Test Item,2024-01-01T10:00:00Z,,Work")); err != nil {
+		t.Fatalf("failed to write to multipart form: %v", err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("failed to close multipart writer: %v", err)
+	}
 
 	req := httptest.NewRequest("POST", "/import/preview", &b)
 	req.Header.Set("Content-Type", w.FormDataContentType())
