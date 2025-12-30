@@ -18,6 +18,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	// Enable foreign keys
+	if _, err := db.Exec("PRAGMA foreign_keys = ON;"); err != nil {
+		log.Fatal(err)
+	}
 	defer func() {
 		if err := db.Close(); err != nil {
 			log.Printf("Error closing database: %v", err)
