@@ -9,6 +9,7 @@
             <em>Active</em>
         {{end}}
     </td>
+    <td>{{duration .StartTime .EndTime}}</td>
     <td>
         <button class="btn btn-sm" 
                 hx-get="/entry/{{.ID}}/edit" 
@@ -56,6 +57,7 @@
                class="form-control"
                style="width: 160px;">
     </td>
+    <td>{{duration .StartTime .EndTime}}</td>
     <td>
         <button class="btn btn-sm btn-primary" 
                 hx-put="/entry/{{.ID}}" 

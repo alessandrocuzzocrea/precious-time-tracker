@@ -6,9 +6,8 @@ import (
 	"html/template"
 	"log"
 	"net/http"
-	"time"
-
 	"strconv"
+	"time"
 
 	"github.com/user/precious-time-tracker/internal/database"
 )
@@ -23,21 +22,61 @@ func (s *Server) routes() {
 	s.Router.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 }
 
-func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
-	// Parse templates
-	// Using relative path execution from root
-	// Parse templates
-	// Using relative path execution from root
-	tmpl, err := template.ParseFiles("templates/base.html", "templates/index.html", "templates/fragments.html")
+func formatDuration(start time.Time, end sql.NullTime) string {
+	if !end.Valid {
+		// Calculate current duration relative to now?
+		// Or just return "-" or "Running"
+		// "Running" is clearer.
+		return "Running"
+	}
+	d := end.Time.Sub(start)
+	return d.Round(time.Second).String()
+}
+
+func (s *Server) render(w http.ResponseWriter, tmplName string, data interface{}, files ...string) {
+	funcs := template.FuncMap{
+		"duration": formatDuration,
+	}
+
+	// Always include fragments
+	allFiles := append([]string{"templates/fragments.html"}, files...)
+
+	// Deduplicate if needed, but ParseFiles handles it? No, duplicates might error or override.
+	// Actually, just passing "templates/base.html" and "templates/index.html" is fine.
+	// I'll make the helper take the specific files needed for that view.
+
+	t, err := template.New("").Funcs(funcs).ParseFiles(allFiles...)
 	if err != nil {
-		http.Error(w, "Template error: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Template parse error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
+	// If tmplName is empty, just Execute (for full pages usually base or index) - wait,
+	// Execute executes the first one or specific?
+	// If I use "base.html" which defines "content", I execute "base.html".
+	// If I use "entry-row", I execute "entry-row".
+
+	if tmplName == "" {
+		// Guess defaults? No, be explicit.
+		// For index.html, it defines "content" but we usually execute the root or "base.html"?
+		// My base.html executes "content".
+		// Index.html defines "content".
+		// I should execute "base.html" (which is just the file name usually).
+		// Wait, ParseFiles returns a template where the name is the *first filename*.
+		if err := t.ExecuteTemplate(w, "base.html", data); err != nil {
+			log.Printf("Template execution error: %v", err)
+		}
+	} else {
+		if err := t.ExecuteTemplate(w, tmplName, data); err != nil {
+			log.Printf("Template execution error: %v", err)
+		}
+	}
+}
+
+func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	entries, err := s.DB.ListTimeEntries(r.Context())
 	if err != nil {
 		log.Printf("Error listing entries: %v", err)
-		// Don't fail completely, just show empty
 		entries = []database.TimeEntry{}
 	}
 
@@ -54,9 +93,7 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		data["Active"] = active
 	}
 
-	if err := tmpl.Execute(w, data); err != nil {
-		log.Printf("Template execution error: %v", err)
-	}
+	s.render(w, "", data, "templates/base.html", "templates/index.html")
 }
 
 func (s *Server) handleStartTimer(w http.ResponseWriter, r *http.Request) {
@@ -125,15 +162,7 @@ func (s *Server) handleGetEntry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tmpl, err := template.ParseFiles("templates/fragments.html")
-	if err != nil {
-		http.Error(w, "Template error: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	if err := tmpl.ExecuteTemplate(w, "entry-row", entry); err != nil {
-		log.Printf("Template execution error: %v", err)
-	}
+	s.render(w, "entry-row", entry)
 }
 
 func (s *Server) handleEditEntry(w http.ResponseWriter, r *http.Request) {
@@ -150,15 +179,7 @@ func (s *Server) handleEditEntry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tmpl, err := template.ParseFiles("templates/fragments.html")
-	if err != nil {
-		http.Error(w, "Template error: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	if err := tmpl.ExecuteTemplate(w, "edit-entry-row", entry); err != nil {
-		log.Printf("Template execution error: %v", err)
-	}
+	s.render(w, "edit-entry-row", entry)
 }
 
 func (s *Server) handleUpdateEntry(w http.ResponseWriter, r *http.Request) {
@@ -220,13 +241,5 @@ func (s *Server) handleUpdateEntry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tmpl, err := template.ParseFiles("templates/fragments.html")
-	if err != nil {
-		http.Error(w, "Template error: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	if err := tmpl.ExecuteTemplate(w, "entry-row", entry); err != nil {
-		log.Printf("Template execution error: %v", err)
-	}
+	s.render(w, "entry-row", entry)
 }
