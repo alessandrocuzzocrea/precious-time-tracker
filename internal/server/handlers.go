@@ -37,6 +37,7 @@ func (s *Server) routes() {
 	s.Router.HandleFunc("GET /data", s.handleDataPage)
 	s.Router.HandleFunc("GET /export", s.handleExportCSV)
 	s.Router.HandleFunc("POST /import", s.handleImportCSV)
+	s.Router.HandleFunc("POST /import/preview", s.handlePreviewCSV)
 	s.Router.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 }
 
@@ -510,4 +511,22 @@ func (s *Server) handleImportCSV(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Redirect(w, r, "/data?success=1", http.StatusSeeOther)
+}
+
+func (s *Server) handlePreviewCSV(w http.ResponseWriter, r *http.Request) {
+	file, _, err := r.FormFile("csv_file")
+	if err != nil {
+		http.Error(w, "Failed to get file", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	preview, err := s.Service.PreviewCSV(r.Context(), file)
+	if err != nil {
+		log.Printf("Preview error: %v", err)
+		http.Error(w, "Preview failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	s.render(w, r, "csv-preview", preview)
 }

@@ -242,3 +242,25 @@ nav a {
 nav a:hover {
     text-decoration: underline;
 }
+
+.badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    color: white;
+}
+
+.badge-success {
+    background-color: #27ae60;
+}
+
+.badge-info {
+    background-color: #3498db;
+}
+
+.btn-secondary {
+    background-color: #95a5a6;
+    color: white;
+}

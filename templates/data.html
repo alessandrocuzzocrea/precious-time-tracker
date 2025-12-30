@@ -13,11 +13,21 @@
         <p>Upload a CSV file to import time entries. The CSV should have headers: <code>id, description, start_time, end_time, category</code>.</p>
         <p><small>If an ID is provided and exists, the entry will be updated. If the ID is missing, a new entry will be created.</small></p>
         
-        <form action="/import" method="POST" enctype="multipart/form-data" style="margin-top: 15px;">
+        <form id="import-form" action="/import" method="POST" enctype="multipart/form-data" style="margin-top: 15px;">
             <div style="margin-bottom: 10px;">
-                <input type="file" name="csv_file" accept=".csv" required>
+                <input type="file" 
+                       id="csv-file-input"
+                       name="csv_file" 
+                       accept=".csv" 
+                       required
+                       hx-post="/import/preview"
+                       hx-trigger="change"
+                       hx-target="#preview-section"
+                       hx-encoding="multipart/form-data">
             </div>
-            <button type="submit" class="btn btn-start">Upload and Import</button>
+            <div id="preview-section">
+                <!-- Preview will be loaded here -->
+            </div>
         </form>
 
         {{if .Success}}

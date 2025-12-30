@@ -249,6 +249,15 @@ type ReportData struct {
 	Filter            ReportFilter
 }
 
+type CSVPreviewEntry struct {
+	ID          int64
+	Description string
+	StartTime   time.Time
+	EndTime     sql.NullTime
+	Category    string
+	Status      string // "New" or "Updated"
+}
+
 func (s *Service) GetReport(ctx context.Context, filter ReportFilter) (ReportData, error) {
 	rows, err := s.db.ListTimeEntriesReport(ctx, database.ListTimeEntriesReportParams{
 		StartTime:      filter.StartDate,
@@ -485,6 +494,91 @@ func (s *Service) ImportCSV(ctx context.Context, r io.Reader) error {
 	}
 
 	return tx.Commit()
+}
+
+func (s *Service) PreviewCSV(ctx context.Context, r io.Reader) ([]CSVPreviewEntry, error) {
+	reader := csv.NewReader(r)
+	records, err := reader.ReadAll()
+	if err != nil {
+		return nil, err
+	}
+
+	if len(records) < 2 {
+		return nil, nil
+	}
+
+	header := records[0]
+	colMap := make(map[string]int)
+	for i, h := range header {
+		colMap[strings.ToLower(strings.TrimSpace(h))] = i
+	}
+
+	var preview []CSVPreviewEntry
+
+	for _, record := range records[1:] {
+		getVal := func(name string) string {
+			if idx, ok := colMap[name]; ok && idx < len(record) {
+				return strings.TrimSpace(record[idx])
+			}
+			return ""
+		}
+
+		idStr := getVal("id")
+		description := getVal("description")
+		startTimeStr := getVal("start_time")
+		endTimeStr := getVal("end_time")
+		categoryName := getVal("category")
+
+		if description == "" && startTimeStr == "" {
+			continue
+		}
+
+		startTime, err := parseFlexTime(startTimeStr)
+		if err != nil {
+			continue // Skip invalid rows for preview or handle error
+		}
+
+		var endTime sql.NullTime
+		if endTimeStr != "" {
+			et, err := parseFlexTime(endTimeStr)
+			if err == nil {
+				endTime = sql.NullTime{Time: et, Valid: true}
+			}
+		}
+
+		id, _ := strconv.ParseInt(idStr, 10, 64)
+		status := "New"
+		if id > 0 {
+			existing, err := s.db.GetTimeEntry(ctx, id)
+			if err == nil {
+				// Compare all fields to see if anything actually changed
+				descMatch := existing.Description == description
+				startMatch := existing.StartTime.Equal(startTime)
+				endMatch := (existing.EndTime.Valid == endTime.Valid)
+				if endMatch && existing.EndTime.Valid {
+					endMatch = existing.EndTime.Time.Equal(endTime.Time)
+				}
+				catMatch := (existing.CategoryName.Valid && existing.CategoryName.String == categoryName) ||
+					(!existing.CategoryName.Valid && categoryName == "")
+
+				if descMatch && startMatch && endMatch && catMatch {
+					continue // No changes, skip from preview
+				}
+				status = "Updated"
+			}
+		}
+
+		preview = append(preview, CSVPreviewEntry{
+			ID:          id,
+			Description: description,
+			StartTime:   startTime,
+			EndTime:     endTime,
+			Category:    categoryName,
+			Status:      status,
+		})
+	}
+
+	return preview, nil
 }
 
 func parseFlexTime(s string) (time.Time, error) {

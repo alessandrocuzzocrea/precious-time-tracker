@@ -86,3 +86,38 @@
     </td>
 </tr>
 {{end}}
+{{define "csv-preview"}}
+<div id="import-preview-container" style="margin-top: 20px;">
+    <h4>Import Preview</h4>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Status</th>
+                <th>Category</th>
+                <th>Description</th>
+                <th>Start Time</th>
+                <th>End Time</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range .}}
+            <tr>
+                <td>
+                    <span class="badge {{if eq .Status "New"}}badge-success{{else}}badge-info{{end}}">
+                        {{.Status}}
+                    </span>
+                </td>
+                <td>{{.Category}}</td>
+                <td>{{.Description}}</td>
+                <td>{{.StartTime.Format "Jan 02 15:04:05"}}</td>
+                <td>{{if .EndTime.Valid}}{{.EndTime.Time.Format "15:04:05"}}{{else}}-{{end}}</td>
+            </tr>
+            {{end}}
+        </tbody>
+    </table>
+    <div style="margin-top: 15px;">
+        <button type="submit" class="btn btn-start" form="import-form">Confirm and Import All</button>
+        <button type="button" class="btn btn-secondary" onclick="document.getElementById('import-preview-container').remove(); document.getElementById('csv-file-input').value='';">Cancel</button>
+    </div>
+</div>
+{{end}}
