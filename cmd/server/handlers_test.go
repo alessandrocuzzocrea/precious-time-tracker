@@ -66,8 +66,14 @@ func TestHandleIndex(t *testing.T) {
 	}
 	// Temporarily change to root for templates
 	oldWd, _ := os.Getwd()
-	os.Chdir(root)
-	defer os.Chdir(oldWd)
+	if err := os.Chdir(root); err != nil {
+		t.Fatalf("failed to chdir to root: %v", err)
+	}
+	defer func() {
+		if err := os.Chdir(oldWd); err != nil {
+			t.Errorf("failed to restore wd: %v", err)
+		}
+	}()
 
 	srv := newTestServer(t)
 	req := httptest.NewRequest("GET", "/", nil)
@@ -93,8 +99,14 @@ func TestHandleStartTimer(t *testing.T) {
 		t.Fatalf("failed to find project root: %v", err)
 	}
 	oldWd, _ := os.Getwd()
-	os.Chdir(root)
-	defer os.Chdir(oldWd)
+	if err := os.Chdir(root); err != nil {
+		t.Fatalf("failed to chdir to root: %v", err)
+	}
+	defer func() {
+		if err := os.Chdir(oldWd); err != nil {
+			t.Errorf("failed to restore wd: %v", err)
+		}
+	}()
 
 	srv := newTestServer(t)
 

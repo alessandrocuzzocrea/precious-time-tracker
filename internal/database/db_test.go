@@ -17,7 +17,7 @@ func TestQueries(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to open db: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Load and apply schema using Goose
 	goose.SetBaseFS(schema.FS)

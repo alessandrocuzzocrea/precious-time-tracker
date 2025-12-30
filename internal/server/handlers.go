@@ -61,10 +61,12 @@ func (s *Server) handleStartTimer(w http.ResponseWriter, r *http.Request) {
 	// For simplicity, let's stop any active one.
 	active, err := s.DB.GetActiveTimeEntry(r.Context())
 	if err == nil {
-		s.DB.UpdateTimeEntry(r.Context(), database.UpdateTimeEntryParams{
+		if _, err := s.DB.UpdateTimeEntry(r.Context(), database.UpdateTimeEntryParams{
 			EndTime: sql.NullTime{Time: time.Now(), Valid: true},
 			ID:      active.ID,
-		})
+		}); err != nil {
+			log.Printf("Failed to stop previous active timer (ID %d): %v", active.ID, err)
+		}
 	}
 
 	_, err = s.DB.CreateTimeEntry(r.Context(), database.CreateTimeEntryParams{
