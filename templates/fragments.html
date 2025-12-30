@@ -33,17 +33,17 @@
         <input type="text" name="start_time" 
                value="{{.Entry.StartTime.Format "2006-01-02 15:04:05"}}" 
                placeholder="YYYY-MM-DD HH:MM:SS"
-               class="form-control"
+               class="form-control time-input start-time"
                style="width: 160px;">
     </td>
     <td>
         <input type="text" name="end_time" 
                value="{{if .Entry.EndTime.Valid}}{{.Entry.EndTime.Time.Format "2006-01-02 15:04:05"}}{{end}}" 
                placeholder="YYYY-MM-DD HH:MM:SS"
-               class="form-control"
+               class="form-control time-input end-time"
                style="width: 160px;">
     </td>
-    <td>{{duration .Entry.StartTime .Entry.EndTime}}</td>
+    <td><span class="live-duration">{{duration .Entry.StartTime .Entry.EndTime}}</span></td>
     <td>
         <button class="btn btn-sm btn-primary" 
                 hx-put="/entry/{{.Entry.ID}}" 

@@ -16,5 +16,54 @@
             {{template "content" .}}
         </main>
     </div>
+    <script>
+        document.addEventListener('input', function(e) {
+            if (e.target.classList.contains('time-input')) {
+                const row = e.target.closest('tr');
+                const startInput = row.querySelector('.start-time');
+                const endInput = row.querySelector('.end-time');
+                const durationDisplay = row.querySelector('.live-duration');
+                
+                if (!startInput || !endInput || !durationDisplay) return;
+
+                const parseDate = (str) => {
+                    // Normalize space to T for ISO parsing
+                    const isoStr = str.replace(' ', 'T');
+                    const d = new Date(isoStr);
+                    return isNaN(d.getTime()) ? null : d;
+                };
+
+                const start = parseDate(startInput.value);
+                const end = parseDate(endInput.value);
+
+                if (start && end) {
+                    if (end < start) {
+                        durationDisplay.textContent = "Invalid (End < Start)";
+                        durationDisplay.style.color = "red";
+                    } else {
+                        const diffMs = end - start;
+                        // Format duration
+                        const seconds = Math.floor((diffMs / 1000) % 60);
+                        const minutes = Math.floor((diffMs / (1000 * 60)) % 60);
+                        const hours = Math.floor((diffMs / (1000 * 60 * 60)));
+
+                        let durFunc = [];
+                        if (hours > 0) durFunc.push(hours + "h");
+                        if (minutes > 0) durFunc.push(minutes + "m");
+                        if (seconds > 0 || durFunc.length === 0) durFunc.push(seconds + "s");
+
+                        durationDisplay.textContent = durFunc.join("");
+                        durationDisplay.style.color = ""; // Reset color
+                    }
+                } else if (start && !endInput.value) {
+                     durationDisplay.textContent = "Running";
+                     durationDisplay.style.color = "";
+                } else {
+                    durationDisplay.textContent = "-";
+                    durationDisplay.style.color = "";
+                }
+            }
+        });
+    </script>
 </body>
 </html>
