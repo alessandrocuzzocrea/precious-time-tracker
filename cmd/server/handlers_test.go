@@ -156,7 +156,7 @@ func TestHandleEditAndUpdate(t *testing.T) {
 
 	// Create an entry
 	ctx := context.Background()
-	entry, err := srv.Service.StartTimer(ctx, "Old Description")
+	entry, err := srv.Service.StartTimer(ctx, "Old Description", nil)
 	if err != nil {
 		t.Fatalf("failed to create entry: %v", err)
 	}

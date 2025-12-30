@@ -21,6 +21,12 @@
                 </form>
             {{else}}
                 <form action="/start" method="POST" class="global-start-form">
+                    <select name="category_id" class="sticky-select">
+                        <option value="">No Category</option>
+                        {{range .Categories}}
+                            <option value="{{.ID}}">{{.Name}}</option>
+                        {{end}}
+                    </select>
                     <input type="text" name="description" placeholder="What are you working on?" required class="sticky-input">
                     <button type="submit" class="btn btn-start btn-sm">Start</button>
                 </form>
@@ -32,6 +38,7 @@
             <h1>Precious Time Tracker</h1>
             <nav style="margin-top: 10px;">
                 <a href="/" style="margin-right: 15px;">Tracker</a>
+                <a href="/categories" style="margin-right: 15px;">Categories</a>
                 <a href="/tags">Tags</a>
             </nav>
         </header>

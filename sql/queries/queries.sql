@@ -1,9 +1,10 @@
 -- name: CreateTimeEntry :one
 INSERT INTO time_entries (
     description,
-    start_time
+    start_time,
+    category_id
 ) VALUES (
-    ?, ?
+    ?, ?, ?
 )
 RETURNING *;
 
@@ -14,25 +15,31 @@ WHERE id = ?
 RETURNING *;
 
 -- name: ListTimeEntries :many
-SELECT * FROM time_entries
-ORDER BY start_time DESC
+SELECT te.*, c.name as category_name, c.color as category_color 
+FROM time_entries te
+LEFT JOIN categories c ON te.category_id = c.id
+ORDER BY te.start_time DESC
 LIMIT 50;
 
 -- name: GetActiveTimeEntry :one
-SELECT * FROM time_entries
-WHERE end_time IS NULL
-ORDER BY start_time DESC
+SELECT te.*, c.name as category_name, c.color as category_color 
+FROM time_entries te
+LEFT JOIN categories c ON te.category_id = c.id
+WHERE te.end_time IS NULL
+ORDER BY te.start_time DESC
 LIMIT 1;
 
 -- name: UpdateTimeEntryFull :one
 UPDATE time_entries
-SET description = ?, start_time = ?, end_time = ?
+SET description = ?, start_time = ?, end_time = ?, category_id = ?
 WHERE id = ?
 RETURNING *;
 
 -- name: GetTimeEntry :one
-SELECT * FROM time_entries
-WHERE id = ?;
+SELECT te.*, c.name as category_name, c.color as category_color 
+FROM time_entries te
+LEFT JOIN categories c ON te.category_id = c.id
+WHERE te.id = ?;
 
 -- name: CreateTag :one
 INSERT INTO tags (name)
@@ -71,3 +78,26 @@ WHERE NOT EXISTS (
 -- name: ListTags :many
 SELECT * FROM tags
 ORDER BY name;
+
+-- name: ListCategories :many
+SELECT * FROM categories
+ORDER BY name;
+
+-- name: CreateCategory :one
+INSERT INTO categories (name, color)
+VALUES (?, ?)
+RETURNING *;
+
+-- name: UpdateCategory :one
+UPDATE categories
+SET name = ?, color = ?
+WHERE id = ?
+RETURNING *;
+
+-- name: DeleteCategory :exec
+DELETE FROM categories
+WHERE id = ?;
+
+-- name: GetCategory :one
+SELECT * FROM categories
+WHERE id = ?;

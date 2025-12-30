@@ -71,15 +71,15 @@ func (s *Service) updateTags(ctx context.Context, qxt *database.Queries, entryID
 	return nil
 }
 
-func (s *Service) ListTimeEntries(ctx context.Context) ([]database.TimeEntry, error) {
+func (s *Service) ListTimeEntries(ctx context.Context) ([]database.ListTimeEntriesRow, error) {
 	return s.db.ListTimeEntries(ctx)
 }
 
-func (s *Service) GetActiveTimeEntry(ctx context.Context) (database.TimeEntry, error) {
+func (s *Service) GetActiveTimeEntry(ctx context.Context) (database.GetActiveTimeEntryRow, error) {
 	return s.db.GetActiveTimeEntry(ctx)
 }
 
-func (s *Service) GetTimeEntry(ctx context.Context, id int64) (database.TimeEntry, error) {
+func (s *Service) GetTimeEntry(ctx context.Context, id int64) (database.GetTimeEntryRow, error) {
 	return s.db.GetTimeEntry(ctx, id)
 }
 
@@ -87,7 +87,34 @@ func (s *Service) ListTags(ctx context.Context) ([]database.Tag, error) {
 	return s.db.ListTags(ctx)
 }
 
-func (s *Service) StartTimer(ctx context.Context, description string) (*database.TimeEntry, error) {
+func (s *Service) ListCategories(ctx context.Context) ([]database.Category, error) {
+	return s.db.ListCategories(ctx)
+}
+
+func (s *Service) CreateCategory(ctx context.Context, name, color string) (database.Category, error) {
+	return s.db.CreateCategory(ctx, database.CreateCategoryParams{
+		Name:  name,
+		Color: color,
+	})
+}
+
+func (s *Service) UpdateCategory(ctx context.Context, id int64, name, color string) (database.Category, error) {
+	return s.db.UpdateCategory(ctx, database.UpdateCategoryParams{
+		ID:    id,
+		Name:  name,
+		Color: color,
+	})
+}
+
+func (s *Service) DeleteCategory(ctx context.Context, id int64) error {
+	return s.db.DeleteCategory(ctx, id)
+}
+
+func (s *Service) GetCategory(ctx context.Context, id int64) (database.Category, error) {
+	return s.db.GetCategory(ctx, id)
+}
+
+func (s *Service) StartTimer(ctx context.Context, description string, categoryID *int64) (*database.GetTimeEntryRow, error) {
 	if description == "" {
 		description = "No description"
 	}
@@ -110,9 +137,15 @@ func (s *Service) StartTimer(ctx context.Context, description string) (*database
 		}
 	}
 
+	var catID sql.NullInt64
+	if categoryID != nil {
+		catID = sql.NullInt64{Int64: *categoryID, Valid: true}
+	}
+
 	entry, err := qtx.CreateTimeEntry(ctx, database.CreateTimeEntryParams{
 		Description: description,
 		StartTime:   time.Now(),
+		CategoryID:  catID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create entry: %w", err)
@@ -127,7 +160,9 @@ func (s *Service) StartTimer(ctx context.Context, description string) (*database
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	return &entry, nil
+	// Fetch the full entry with category info
+	fullEntry, err := s.db.GetTimeEntry(ctx, entry.ID)
+	return &fullEntry, err
 }
 
 func (s *Service) StopTimer(ctx context.Context) error {
@@ -143,7 +178,7 @@ func (s *Service) StopTimer(ctx context.Context) error {
 	return err
 }
 
-func (s *Service) UpdateTimeEntry(ctx context.Context, id int64, description string, start time.Time, end sql.NullTime) (*database.TimeEntry, error) {
+func (s *Service) UpdateTimeEntry(ctx context.Context, id int64, description string, start time.Time, end sql.NullTime, categoryID *int64) (*database.GetTimeEntryRow, error) {
 	tx, err := s.rawDB.Begin()
 	if err != nil {
 		return nil, fmt.Errorf("failed to start transaction: %w", err)
@@ -151,10 +186,16 @@ func (s *Service) UpdateTimeEntry(ctx context.Context, id int64, description str
 	defer func() { _ = tx.Rollback() }()
 	qtx := s.db.WithTx(tx)
 
+	var catID sql.NullInt64
+	if categoryID != nil {
+		catID = sql.NullInt64{Int64: *categoryID, Valid: true}
+	}
+
 	entry, err := qtx.UpdateTimeEntryFull(ctx, database.UpdateTimeEntryFullParams{
 		Description: description,
 		StartTime:   start,
 		EndTime:     end,
+		CategoryID:  catID,
 		ID:          id,
 	})
 	if err != nil {
@@ -170,7 +211,8 @@ func (s *Service) UpdateTimeEntry(ctx context.Context, id int64, description str
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	return &entry, nil
+	fullEntry, err := s.db.GetTimeEntry(ctx, id)
+	return &fullEntry, err
 }
 
 func (s *Service) DeleteTimeEntry(ctx context.Context, id int64) error {

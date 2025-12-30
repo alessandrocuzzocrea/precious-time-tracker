@@ -13,8 +13,9 @@ import (
 )
 
 type editData struct {
-	Entry database.TimeEntry
-	Error string
+	Entry      interface{} // Can be GetTimeEntryRow or database.TimeEntry
+	Categories []database.Category
+	Error      string
 }
 
 func (s *Server) routes() {
@@ -24,6 +25,10 @@ func (s *Server) routes() {
 	s.Router.HandleFunc("GET /entry/{id}", s.handleGetEntry)
 	s.Router.HandleFunc("GET /entry/{id}/edit", s.handleEditEntry)
 	s.Router.HandleFunc("GET /tags", s.handleListTags)
+	s.Router.HandleFunc("GET /categories", s.handleListCategories)
+	s.Router.HandleFunc("POST /categories", s.handleCreateCategory)
+	s.Router.HandleFunc("POST /categories/{id}", s.handleUpdateCategory)
+	s.Router.HandleFunc("DELETE /categories/{id}", s.handleDeleteCategory)
 	s.Router.HandleFunc("PUT /entry/{id}", s.handleUpdateEntry)
 	s.Router.HandleFunc("DELETE /entry/{id}", s.handleDeleteEntry)
 	s.Router.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
@@ -93,11 +98,17 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	entries, err := s.Service.ListTimeEntries(r.Context())
 	if err != nil {
 		log.Printf("Error listing entries: %v", err)
-		entries = []database.TimeEntry{}
+		entries = []database.ListTimeEntriesRow{}
+	}
+	categories, err := s.Service.ListCategories(r.Context())
+	if err != nil {
+		log.Printf("Error listing categories: %v", err)
+		categories = []database.Category{}
 	}
 
 	data := map[string]interface{}{
-		"Entries": entries,
+		"Entries":    entries,
+		"Categories": categories,
 	}
 	// Active will be filled by render if tmplName is ""
 
@@ -106,8 +117,15 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleStartTimer(w http.ResponseWriter, r *http.Request) {
 	description := r.FormValue("description")
+	catIDStr := r.FormValue("category_id")
+	var catID *int64
+	if catIDStr != "" {
+		if id, err := strconv.ParseInt(catIDStr, 10, 64); err == nil {
+			catID = &id
+		}
+	}
 
-	_, err := s.Service.StartTimer(r.Context(), description)
+	_, err := s.Service.StartTimer(r.Context(), description, catID)
 	if err != nil {
 		http.Error(w, "Failed to start timer: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -156,7 +174,9 @@ func (s *Server) handleEditEntry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.render(w, r, "edit-entry-row", editData{Entry: entry})
+	categories, _ := s.Service.ListCategories(r.Context())
+
+	s.render(w, r, "edit-entry-row", editData{Entry: entry, Categories: categories})
 }
 
 func (s *Server) handleUpdateEntry(w http.ResponseWriter, r *http.Request) {
@@ -222,9 +242,18 @@ func (s *Server) handleUpdateEntry(w http.ResponseWriter, r *http.Request) {
 		endTime = sql.NullTime{Time: et, Valid: true}
 	}
 
-	entry, err := s.Service.UpdateTimeEntry(r.Context(), id, description, startTime, endTime)
+	catIDStr := r.FormValue("category_id")
+	var catID *int64
+	if catIDStr != "" {
+		if cid, err := strconv.ParseInt(catIDStr, 10, 64); err == nil {
+			catID = &cid
+		}
+	}
+
+	entry, err := s.Service.UpdateTimeEntry(r.Context(), id, description, startTime, endTime, catID)
 	if err != nil {
-		s.render(w, r, "edit-entry-row", editData{Entry: originalEntry, Error: "Failed to update: " + err.Error()})
+		categories, _ := s.Service.ListCategories(r.Context())
+		s.render(w, r, "edit-entry-row", editData{Entry: originalEntry, Categories: categories, Error: "Failed to update: " + err.Error()})
 		return
 	}
 
@@ -260,4 +289,71 @@ func (s *Server) handleListTags(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.render(w, r, "", data, "templates/base.html", "templates/tags.html")
+}
+
+func (s *Server) handleListCategories(w http.ResponseWriter, r *http.Request) {
+	categories, err := s.Service.ListCategories(r.Context())
+	if err != nil {
+		log.Printf("Error listing categories: %v", err)
+		http.Error(w, "Failed to list categories", http.StatusInternalServerError)
+		return
+	}
+
+	data := map[string]interface{}{
+		"Categories": categories,
+	}
+
+	s.render(w, r, "", data, "templates/base.html", "templates/categories.html")
+}
+
+func (s *Server) handleCreateCategory(w http.ResponseWriter, r *http.Request) {
+	name := r.FormValue("name")
+	color := r.FormValue("color")
+	if color == "" {
+		color = "#cccccc"
+	}
+
+	_, err := s.Service.CreateCategory(r.Context(), name, color)
+	if err != nil {
+		http.Error(w, "Failed to create category: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, "/categories", http.StatusSeeOther)
+}
+
+func (s *Server) handleUpdateCategory(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	name := r.FormValue("name")
+	color := r.FormValue("color")
+
+	_, err = s.Service.UpdateCategory(r.Context(), id, name, color)
+	if err != nil {
+		http.Error(w, "Failed to update category: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, "/categories", http.StatusSeeOther)
+}
+
+func (s *Server) handleDeleteCategory(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	if err := s.Service.DeleteCategory(r.Context(), id); err != nil {
+		http.Error(w, "Failed to delete category", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }

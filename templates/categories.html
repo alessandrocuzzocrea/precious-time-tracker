@@ -1,0 +1,56 @@
+{{define "content"}}
+<div class="categories-container">
+    <h2>Manage Categories</h2>
+    
+    <div class="card" style="margin-bottom: 20px; padding: 15px;">
+        <h3>Add New Category</h3>
+        <form action="/categories" method="POST" class="category-form">
+            <div class="form-group" style="display: flex; gap: 10px; align-items: flex-end;">
+                <div style="flex: 2;">
+                    <label>Name</label>
+                    <input type="text" name="name" required class="form-control" placeholder="Work, Personal, etc.">
+                </div>
+                <div style="flex: 1;">
+                    <label>Color</label>
+                    <input type="color" name="color" value="#cccccc" class="form-control" style="height: 38px;">
+                </div>
+                <button type="submit" class="btn btn-start">Add Category</button>
+            </div>
+        </form>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Category</th>
+                <th>Color</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range .Categories}}
+                <tr id="cat-{{.ID}}">
+                    <form action="/categories/{{.ID}}" method="POST">
+                        <td>
+                            <input type="text" name="name" value="{{.Name}}" required class="form-control">
+                        </td>
+                        <td>
+                            <input type="color" name="color" value="{{.Color}}" class="form-control" style="height: 38px; width: 60px;">
+                        </td>
+                        <td>
+                            <button type="submit" class="btn btn-sm">Update</button>
+                            <button type="button" class="btn btn-sm btn-danger"
+                                    hx-delete="/categories/{{.ID}}"
+                                    hx-target="#cat-{{.ID}}"
+                                    hx-swap="outerHTML"
+                                    hx-confirm="Are you sure? This will unassign this category from all time entries.">
+                                Delete
+                            </button>
+                        </td>
+                    </form>
+                </tr>
+            {{end}}
+        </tbody>
+    </table>
+</div>
+{{end}}

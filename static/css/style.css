@@ -144,3 +144,71 @@ td {
 th {
     background-color: #f8f9fa;
 }
+
+.category-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    color: white;
+    margin-right: 8px;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
+}
+
+.sticky-select {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    padding: 8px;
+    color: white;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.sticky-select option {
+    background: #2c3e50;
+    color: white;
+}
+
+.category-form label {
+    display: block;
+    font-size: 0.85rem;
+    margin-bottom: 4px;
+    color: #666;
+}
+
+.card {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.form-control {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+.btn-danger {
+    background-color: #e74c3c;
+    color: white;
+}
+
+.btn-primary {
+    background-color: #3498db;
+    color: white;
+}
+
+nav a {
+    text-decoration: none;
+    color: #3498db;
+    font-weight: 500;
+}
+
+nav a:hover {
+    text-decoration: underline;
+}
