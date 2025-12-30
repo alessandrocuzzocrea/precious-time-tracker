@@ -559,11 +559,18 @@ func (s *Service) PreviewCSV(ctx context.Context, r io.Reader) ([]CSVPreviewEntr
 			existing, err := s.db.GetTimeEntry(ctx, id)
 			if err == nil {
 				// Compare all fields to see if anything actually changed
-				descChanged = existing.Description != description
-				startChanged = !existing.StartTime.Equal(startTime)
+				// Truncate times to seconds to avoid precision issues from DB vs CSV
+				dbStartTime := existing.StartTime.Truncate(time.Second)
+				csvStartTime := startTime.Truncate(time.Second)
+
+				descChanged = strings.TrimSpace(existing.Description) != description
+				startChanged = !dbStartTime.Equal(csvStartTime)
+
 				endChanged = (existing.EndTime.Valid != endTime.Valid)
 				if !endChanged && existing.EndTime.Valid {
-					endChanged = !existing.EndTime.Time.Equal(endTime.Time)
+					dbEndTime := existing.EndTime.Time.Truncate(time.Second)
+					csvEndTime := endTime.Time.Truncate(time.Second)
+					endChanged = !dbEndTime.Equal(csvEndTime)
 				}
 				catChanged = !((existing.CategoryName.Valid && existing.CategoryName.String == categoryName) ||
 					(!existing.CategoryName.Valid && categoryName == ""))
