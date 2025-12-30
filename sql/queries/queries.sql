@@ -57,3 +57,7 @@ WHERE tet.time_entry_id = ?;
 DELETE FROM time_entry_tags
 WHERE time_entry_id = ?;
 
+
+-- name: DeleteTimeEntry :exec
+DELETE FROM time_entries
+WHERE id = ?;

@@ -17,6 +17,13 @@
                 hx-swap="outerHTML">
             Edit
         </button>
+        <button class="btn btn-sm btn-danger"
+                hx-delete="/entry/{{.ID}}"
+                hx-target="#entry-{{.ID}}"
+                hx-swap="outerHTML"
+                hx-confirm="Are you sure?">
+            Delete
+        </button>
     </td>
 </tr>
 {{end}}

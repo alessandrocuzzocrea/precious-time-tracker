@@ -69,6 +69,7 @@ func (s *Server) routes() {
 	s.Router.HandleFunc("GET /entry/{id}", s.handleGetEntry)
 	s.Router.HandleFunc("GET /entry/{id}/edit", s.handleEditEntry)
 	s.Router.HandleFunc("PUT /entry/{id}", s.handleUpdateEntry)
+	s.Router.HandleFunc("DELETE /entry/{id}", s.handleDeleteEntry)
 	s.Router.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 }
 
@@ -349,4 +350,21 @@ func (s *Server) handleUpdateEntry(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.render(w, "entry-row", entry)
+}
+
+func (s *Server) handleDeleteEntry(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	if err := s.DB.DeleteTimeEntry(r.Context(), id); err != nil {
+		http.Error(w, "Failed to delete entry", http.StatusInternalServerError)
+		return
+	}
+
+	// Return empty string to remove the element from DOM or status 200
+	w.WriteHeader(http.StatusOK)
 }
