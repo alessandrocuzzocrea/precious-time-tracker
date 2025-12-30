@@ -377,6 +377,70 @@ func (q *Queries) ListTimeEntries(ctx context.Context) ([]ListTimeEntriesRow, er
 	return items, nil
 }
 
+const listTimeEntriesReport = `-- name: ListTimeEntriesReport :many
+SELECT te.id, te.description, te.start_time, te.end_time, te.created_at, te.category_id, c.name as category_name, c.color as category_color 
+FROM time_entries te
+LEFT JOIN categories c ON te.category_id = c.id
+WHERE te.end_time IS NOT NULL
+AND te.start_time >= ?
+AND te.start_time <= ?
+AND (
+    (?3 = 0)
+    OR (te.category_id = ?3)
+    OR (?3 = -1 AND te.category_id IS NULL)
+)
+ORDER BY te.start_time DESC
+`
+
+type ListTimeEntriesReportParams struct {
+	StartTime      time.Time   `json:"start_time"`
+	StartTime_2    time.Time   `json:"start_time_2"`
+	CategoryFilter interface{} `json:"category_filter"`
+}
+
+type ListTimeEntriesReportRow struct {
+	ID            int64          `json:"id"`
+	Description   string         `json:"description"`
+	StartTime     time.Time      `json:"start_time"`
+	EndTime       sql.NullTime   `json:"end_time"`
+	CreatedAt     time.Time      `json:"created_at"`
+	CategoryID    sql.NullInt64  `json:"category_id"`
+	CategoryName  sql.NullString `json:"category_name"`
+	CategoryColor sql.NullString `json:"category_color"`
+}
+
+func (q *Queries) ListTimeEntriesReport(ctx context.Context, arg ListTimeEntriesReportParams) ([]ListTimeEntriesReportRow, error) {
+	rows, err := q.db.QueryContext(ctx, listTimeEntriesReport, arg.StartTime, arg.StartTime_2, arg.CategoryFilter)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListTimeEntriesReportRow
+	for rows.Next() {
+		var i ListTimeEntriesReportRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Description,
+			&i.StartTime,
+			&i.EndTime,
+			&i.CreatedAt,
+			&i.CategoryID,
+			&i.CategoryName,
+			&i.CategoryColor,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateCategory = `-- name: UpdateCategory :one
 UPDATE categories
 SET name = ?, color = ?

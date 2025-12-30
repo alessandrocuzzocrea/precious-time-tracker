@@ -3,7 +3,7 @@ package server
 import (
 	"net/http"
 
-	"github.com/user/precious-time-tracker/internal/service"
+	"github.com/alessandrocuzzocrea/precious-time-tracker/internal/service"
 )
 
 type Server struct {

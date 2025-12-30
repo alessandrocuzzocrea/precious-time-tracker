@@ -13,10 +13,10 @@ import (
 	"testing"
 
 	"github.com/pressly/goose/v3"
-	"github.com/user/precious-time-tracker/internal/database"
-	"github.com/user/precious-time-tracker/internal/server"
-	"github.com/user/precious-time-tracker/internal/service"
-	"github.com/user/precious-time-tracker/sql/schema"
+	"github.com/alessandrocuzzocrea/precious-time-tracker/internal/database"
+	"github.com/alessandrocuzzocrea/precious-time-tracker/internal/server"
+	"github.com/alessandrocuzzocrea/precious-time-tracker/internal/service"
+	"github.com/alessandrocuzzocrea/precious-time-tracker/sql/schema"
 
 	_ "modernc.org/sqlite"
 )

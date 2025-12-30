@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/pressly/goose/v3"
-	"github.com/user/precious-time-tracker/sql/schema"
+	"github.com/alessandrocuzzocrea/precious-time-tracker/sql/schema"
 	_ "modernc.org/sqlite"
 )
 
