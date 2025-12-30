@@ -207,3 +207,54 @@ func TestDeleteEntryKeepsTags(t *testing.T) {
 		t.Errorf("Tag ID mismatch")
 	}
 }
+
+func TestOrphanedTagsRemains(t *testing.T) {
+	// This test specifically verifies that when a tag becomes "orphaned" (no entries use it),
+	// it is NOT deleted from the tags table.
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("failed to open db: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	if _, err := db.Exec("PRAGMA foreign_keys = ON;"); err != nil {
+		t.Fatalf("failed to enable foreign keys: %v", err)
+	}
+
+	goose.SetBaseFS(schema.FS)
+	if err := goose.SetDialect("sqlite"); err != nil {
+		t.Fatalf("failed to set dialect: %v", err)
+	}
+	if err := goose.Up(db, "."); err != nil {
+		t.Fatalf("failed to run migrations: %v", err)
+	}
+
+	q := New(db)
+	ctx := context.Background()
+
+	// 1. Create Entry with Tag
+	entry, _ := q.CreateTimeEntry(ctx, CreateTimeEntryParams{Description: "Orphan Maker", StartTime: time.Now()})
+	tag, _ := q.CreateTag(ctx, "orphan_candidate")
+	_ = q.CreateTimeEntryTag(ctx, CreateTimeEntryTagParams{TimeEntryID: entry.ID, TagID: tag.ID})
+
+	// 2. Delete the ONLY entry using verify tag
+	if err := q.DeleteTimeEntry(ctx, entry.ID); err != nil {
+		t.Fatalf("DeleteTimeEntry failed: %v", err)
+	}
+
+	// 3. Verify the link is gone
+	tagsForEntry, _ := q.ListTagsForTimeEntry(ctx, entry.ID)
+	if len(tagsForEntry) != 0 {
+		t.Errorf("Link should be gone")
+	}
+
+	// 4. Verify the Tag ITSELF still exists (it is now an orphan)
+	// If the app WAS deleting orphans, this GetTagByName would fail or return error.
+	fetchedTag, err := q.GetTagByName(ctx, "orphan_candidate")
+	if err != nil {
+		t.Fatalf("Tag was deleted! (Unexpected if we assume no GC): %v", err)
+	}
+	if fetchedTag.ID != tag.ID {
+		t.Errorf("Tag ID mismatch")
+	}
+}
