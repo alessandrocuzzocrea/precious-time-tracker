@@ -28,13 +28,11 @@ jobs:
       - run: go mod download
       - run: go mod verify
       - run: go vet ./...
-      - run: go test -v -race -coverpkg=./... -coverprofile=coverage.out ./...
-      - run: go tool cover -html=coverage.out -o coverage.html
-      - uses: codecov/codecov-action@v4
+      - run: go test -v -race -coverpkg=./... -coverprofile=coverage.txt ./...
+      - run: go tool cover -html=coverage.txt -o coverage.html
+      - uses: codecov/codecov-action@v5
         with:
-          file: ./coverage.out
-          flags: unittests
-          name: codecov-umbrella
+          token: ${{ secrets.CODECOV_TOKEN }}
       - uses: actions/upload-artifact@v4
         with:
           name: coverage-report
