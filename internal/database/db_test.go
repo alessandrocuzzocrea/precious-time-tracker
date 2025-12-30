@@ -208,9 +208,8 @@ func TestDeleteEntryKeepsTags(t *testing.T) {
 	}
 }
 
-func TestOrphanedTagsRemains(t *testing.T) {
-	// This test specifically verifies that when a tag becomes "orphaned" (no entries use it),
-	// it is NOT deleted from the tags table.
+func TestDeleteOrphanedTags(t *testing.T) {
+	// This test verifies that DeleteOrphanedTags query works as expected.
 	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("failed to open db: %v", err)
@@ -237,24 +236,23 @@ func TestOrphanedTagsRemains(t *testing.T) {
 	tag, _ := q.CreateTag(ctx, "orphan_candidate")
 	_ = q.CreateTimeEntryTag(ctx, CreateTimeEntryTagParams{TimeEntryID: entry.ID, TagID: tag.ID})
 
-	// 2. Delete the ONLY entry using verify tag
+	// 2. Delete the ONLY entry
 	if err := q.DeleteTimeEntry(ctx, entry.ID); err != nil {
 		t.Fatalf("DeleteTimeEntry failed: %v", err)
 	}
 
-	// 3. Verify the link is gone
-	tagsForEntry, _ := q.ListTagsForTimeEntry(ctx, entry.ID)
-	if len(tagsForEntry) != 0 {
-		t.Errorf("Link should be gone")
+	// 3. Verify Tag STILL EXISTS (Trigger is gone)
+	if _, err := q.GetTagByName(ctx, "orphan_candidate"); err != nil {
+		t.Errorf("Tag should still exist before explicit cleanup")
 	}
 
-	// 4. Verify the Tag ITSELF still exists (it is now an orphan)
-	// If the app WAS deleting orphans, this GetTagByName would fail or return error.
-	fetchedTag, err := q.GetTagByName(ctx, "orphan_candidate")
-	if err != nil {
-		t.Fatalf("Tag was deleted! (Unexpected if we assume no GC): %v", err)
+	// 4. Run Custom Cleanup
+	if err := q.DeleteOrphanedTags(ctx); err != nil {
+		t.Fatalf("DeleteOrphanedTags failed: %v", err)
 	}
-	if fetchedTag.ID != tag.ID {
-		t.Errorf("Tag ID mismatch")
+
+	// 5. Verify Tag is GONE
+	if _, err := q.GetTagByName(ctx, "orphan_candidate"); err == nil {
+		t.Errorf("Tag should have been deleted after cleanup!")
 	}
 }

@@ -59,6 +59,15 @@ func (s *Server) updateTags(ctx context.Context, qxt *database.Queries, entryID 
 			return err
 		}
 	}
+
+	// Clean up any orphaned tags
+	if err := qxt.DeleteOrphanedTags(ctx); err != nil {
+		// Log but don't fail properly? It's maintenance.
+		// Since we are in a transaction (passed qxt), this is fine.
+		// Ideally we shouldn't fail the user request if cleanup fails, but consistency is nice.
+		// Let's return error to be safe.
+		return err
+	}
 	return nil
 }
 
@@ -363,6 +372,12 @@ func (s *Server) handleDeleteEntry(w http.ResponseWriter, r *http.Request) {
 	if err := s.DB.DeleteTimeEntry(r.Context(), id); err != nil {
 		http.Error(w, "Failed to delete entry", http.StatusInternalServerError)
 		return
+	}
+
+	// Clean up orphans
+	if err := s.DB.DeleteOrphanedTags(r.Context()); err != nil {
+		log.Printf("Failed to cleanup tags: %v", err)
+		// Don't fail request
 	}
 
 	// Return empty string to remove the element from DOM or status 200

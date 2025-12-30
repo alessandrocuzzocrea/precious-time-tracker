@@ -61,3 +61,9 @@ WHERE time_entry_id = ?;
 -- name: DeleteTimeEntry :exec
 DELETE FROM time_entries
 WHERE id = ?;
+
+-- name: DeleteOrphanedTags :exec
+DELETE FROM tags
+WHERE NOT EXISTS (
+    SELECT 1 FROM time_entry_tags WHERE tag_id = tags.id
+);

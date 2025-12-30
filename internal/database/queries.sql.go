@@ -68,6 +68,18 @@ func (q *Queries) CreateTimeEntryTag(ctx context.Context, arg CreateTimeEntryTag
 	return err
 }
 
+const deleteOrphanedTags = `-- name: DeleteOrphanedTags :exec
+DELETE FROM tags
+WHERE NOT EXISTS (
+    SELECT 1 FROM time_entry_tags WHERE tag_id = tags.id
+)
+`
+
+func (q *Queries) DeleteOrphanedTags(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, deleteOrphanedTags)
+	return err
+}
+
 const deleteTimeEntry = `-- name: DeleteTimeEntry :exec
 DELETE FROM time_entries
 WHERE id = ?
