@@ -32,10 +32,10 @@
             {{range .Entries}}
             <tr>
                 <td>{{.Description}}</td>
-                <td>{{.StartTime.Format "Jan 02 15:04"}}</td>
+                <td>{{.StartTime.Format "Jan 02 15:04:05"}}</td>
                 <td>
                     {{if .EndTime.Valid}}
-                        {{.EndTime.Time.Format "15:04"}}
+                        {{.EndTime.Time.Format "15:04:05"}}
                     {{else}}
                         <em>Active</em>
                     {{end}}
