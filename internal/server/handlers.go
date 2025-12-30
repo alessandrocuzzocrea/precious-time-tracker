@@ -502,7 +502,11 @@ func (s *Server) handleImportCSV(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to get file", http.StatusBadRequest)
 		return
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			log.Printf("Failed to close file: %v", err)
+		}
+	}()
 
 	if err := s.Service.ImportCSV(r.Context(), file); err != nil {
 		log.Printf("Import error: %v", err)
@@ -519,7 +523,11 @@ func (s *Server) handlePreviewCSV(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to get file", http.StatusBadRequest)
 		return
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			log.Printf("Failed to close file: %v", err)
+		}
+	}()
 
 	preview, err := s.Service.PreviewCSV(r.Context(), file)
 	if err != nil {

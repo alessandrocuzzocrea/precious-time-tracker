@@ -572,8 +572,8 @@ func (s *Service) PreviewCSV(ctx context.Context, r io.Reader) ([]CSVPreviewEntr
 					csvEndTime := endTime.Time.Truncate(time.Second)
 					endChanged = !dbEndTime.Equal(csvEndTime)
 				}
-				catChanged = !((existing.CategoryName.Valid && existing.CategoryName.String == categoryName) ||
-					(!existing.CategoryName.Valid && categoryName == ""))
+				catChanged = (!existing.CategoryName.Valid || existing.CategoryName.String != categoryName) &&
+					(existing.CategoryName.Valid || categoryName != "")
 
 				if !descChanged && !startChanged && !endChanged && !catChanged {
 					continue // No changes, skip from preview
