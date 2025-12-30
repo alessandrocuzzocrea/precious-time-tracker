@@ -28,8 +28,8 @@ go.work
 Thumbs.db
 
 # Project specific
-tracker.db
-tracker.db-journal
-tracker.db-wal
+precious-time-tracker.sqlite3
+precious-time-tracker.sqlite3-journal
+precious-time-tracker.sqlite3-wal
 
 tmp

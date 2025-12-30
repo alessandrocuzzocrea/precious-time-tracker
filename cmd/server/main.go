@@ -15,7 +15,7 @@ import (
 
 func main() {
 	// Setup DB
-	db, err := sql.Open("sqlite", "./tracker.db")
+	db, err := sql.Open("sqlite", "./precious-time-tracker.sqlite3")
 	if err != nil {
 		log.Fatal(err)
 	}
