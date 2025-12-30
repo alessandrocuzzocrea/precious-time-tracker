@@ -28,8 +28,19 @@ jobs:
       - run: go mod download
       - run: go mod verify
       - run: go vet ./...
-      - run: go test -v -race -coverpkg=./... -coverprofile=coverage.txt ./...
+      - name: Install gotestsum
+        run: go install gotest.tools/gotestsum@latest
+
+      - name: Run tests
+        run: gotestsum --junitfile junit.xml -- -v -race -coverpkg=./... -coverprofile=coverage.txt ./...
+
       - run: go tool cover -html=coverage.txt -o coverage.html
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
       - uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
