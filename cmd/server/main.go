@@ -6,14 +6,14 @@ import (
 	"net/http"
 	"os"
 
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/user/precious-time-tracker/internal/database"
 	"github.com/user/precious-time-tracker/internal/server"
+	_ "modernc.org/sqlite"
 )
 
 func main() {
 	// Setup DB
-	db, err := sql.Open("sqlite3", "./tracker.db")
+	db, err := sql.Open("sqlite", "./tracker.db")
 	if err != nil {
 		log.Fatal(err)
 	}

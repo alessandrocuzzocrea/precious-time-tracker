@@ -7,28 +7,50 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/user/precious-time-tracker/internal/database"
 	"github.com/user/precious-time-tracker/internal/server"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
+
+func getProjectRoot() (string, error) {
+	wd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(wd, "go.mod")); err == nil {
+			return wd, nil
+		}
+		parent := filepath.Dir(wd)
+		if parent == wd {
+			return "", os.ErrNotExist
+		}
+		wd = parent
+	}
+}
 
 func newTestServer(t *testing.T) *server.Server {
 	// Setup in-memory DB
-	db, err := sql.Open("sqlite3", ":memory:")
+	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("failed to open db: %v", err)
 	}
 
-	// Load schema
-	// Path is relative to cmd/server
-	// cmd/server -> ../../sql/schema
-	schemaBytes, err := os.ReadFile("../../sql/schema/001_users_and_entries.sql")
+	root, err := getProjectRoot()
 	if err != nil {
-		t.Fatalf("failed to read schema: %v", err)
+		t.Fatalf("failed to find project root: %v", err)
+	}
+
+	// Load schema
+	schemaPath := filepath.Join(root, "sql/schema/001_users_and_entries.sql")
+	schemaBytes, err := os.ReadFile(schemaPath)
+	if err != nil {
+		t.Fatalf("failed to read schema from %s: %v", schemaPath, err)
 	}
 	if _, err := db.Exec(string(schemaBytes)); err != nil {
 		t.Fatalf("failed to execute schema: %v", err)
@@ -39,23 +61,18 @@ func newTestServer(t *testing.T) *server.Server {
 }
 
 func TestHandleIndex(t *testing.T) {
+	root, err := getProjectRoot()
+	if err != nil {
+		t.Fatalf("failed to find project root: %v", err)
+	}
+	// Temporarily change to root for templates
+	oldWd, _ := os.Getwd()
+	os.Chdir(root)
+	defer os.Chdir(oldWd)
+
 	srv := newTestServer(t)
 	req := httptest.NewRequest("GET", "/", nil)
 	w := httptest.NewRecorder()
-
-	// Need to fix template path for tests since they run in cmd/server
-	// But the handler uses "templates/base.html" which is relative to CWD.
-	// If we run test from cmd/server, CWD is cmd/server.
-	// But the templates are in ../../templates.
-	// This is a common issue.
-	// We can change the CWD in the test or use absolute paths in the handler.
-	// For this test, let's just cheat and skip template rendering check or
-	// assume we run tests from root.
-	// Actually, the handler uses `template.ParseFiles("templates/...")`.
-	// If we run `go test ./cmd/server`, we are in `cmd/server`.
-	// So `templates/` won't be found.
-	// We should probably change directory to root for the test.
-	os.Chdir("../../")
 
 	srv.ServeHTTP(w, req)
 
@@ -70,20 +87,15 @@ func TestHandleIndex(t *testing.T) {
 }
 
 func TestHandleStartTimer(t *testing.T) {
-	// os.Chdir("../../") // Already changed in previous test if run sequentially?
-	// But to be safe lets ensure we are at root.
-	// Note: changing CWD in tests is risky if parallel.
-	// For simplicity, we assume sequential or just do it once.
-	// Better: use setup function.
-
-	// We need to be in root for template parsing in other handlers if they used it,
-	// but StartTimer issues a redirect, so it might not need templates?
-	// StartTimer uses DB.
-
-	wd, _ := os.Getwd()
-	if !strings.HasSuffix(wd, "precious-time-tracker") {
-		os.Chdir("../../")
+	// StartTimer handler issues redirect and DB writes, doesn't strictly need templates
+	// effectively, but let's be safe and consistent.
+	root, err := getProjectRoot()
+	if err != nil {
+		t.Fatalf("failed to find project root: %v", err)
 	}
+	oldWd, _ := os.Getwd()
+	os.Chdir(root)
+	defer os.Chdir(oldWd)
 
 	srv := newTestServer(t)
 
