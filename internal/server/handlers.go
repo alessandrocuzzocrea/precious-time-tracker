@@ -174,8 +174,37 @@ func (s *Server) handleUpdateEntry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	entry, err := s.DB.UpdateEntryDescription(r.Context(), database.UpdateEntryDescriptionParams{
+	startTimeStr := r.FormValue("start_time")
+	// Format from datetime-local input
+	const layout = "2006-01-02T15:04:05" // with step=1
+	startTime, err := time.Parse(layout, startTimeStr)
+	if err != nil {
+		// Try without seconds if step wasn't respected for some reason, though we set step=1
+		startTime, err = time.Parse("2006-01-02T15:04", startTimeStr)
+		if err != nil {
+			http.Error(w, "Invalid start time format: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+
+	endTimeStr := r.FormValue("end_time")
+	var endTime sql.NullTime
+	if endTimeStr != "" {
+		et, err := time.Parse(layout, endTimeStr)
+		if err != nil {
+			et, err = time.Parse("2006-01-02T15:04", endTimeStr)
+			if err != nil {
+				http.Error(w, "Invalid end time format: "+err.Error(), http.StatusBadRequest)
+				return
+			}
+		}
+		endTime = sql.NullTime{Time: et, Valid: true}
+	}
+
+	entry, err := s.DB.UpdateTimeEntryFull(r.Context(), database.UpdateTimeEntryFullParams{
 		Description: description,
+		StartTime:   startTime,
+		EndTime:     endTime,
 		ID:          id,
 	})
 	if err != nil {

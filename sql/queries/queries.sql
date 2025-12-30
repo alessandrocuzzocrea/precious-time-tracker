@@ -24,9 +24,9 @@ WHERE end_time IS NULL
 ORDER BY start_time DESC
 LIMIT 1;
 
--- name: UpdateEntryDescription :one
+-- name: UpdateTimeEntryFull :one
 UPDATE time_entries
-SET description = ?
+SET description = ?, start_time = ?, end_time = ?
 WHERE id = ?
 RETURNING *;
 

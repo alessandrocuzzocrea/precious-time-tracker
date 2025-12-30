@@ -31,3 +31,5 @@ Thumbs.db
 tracker.db
 tracker.db-journal
 tracker.db-wal
+
+tmp

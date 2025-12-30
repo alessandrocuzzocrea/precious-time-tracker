@@ -23,25 +23,46 @@
 {{define "edit-entry-row"}}
 <tr id="entry-{{.ID}}">
     <td>
-        <form hx-put="/entry/{{.ID}}" hx-target="#entry-{{.ID}}" hx-swap="outerHTML">
-            <input type="text" name="description" value="{{.Description}}" autofocus>
-            <button type="submit" class="btn btn-sm btn-primary">Save</button>
-            <button type="button" class="btn btn-sm" 
-                    hx-get="/entry/{{.ID}}" 
-                    hx-target="#entry-{{.ID}}" 
-                    hx-swap="outerHTML">
-                Cancel
-            </button>
-        </form>
+        <!-- Form wraps the whole row inputs effectively by keeping them outside or using form attribute if they were separate... 
+             Wait, wrapping TR in Form is invalid HTML.
+             Browsers might handle it, but it's bad.
+             HTMX supports `hx-include` to include other inputs.
+             OR we can put the form inside one TD and use `form="myform"` attribute on inputs? No.
+             
+             Standard way to edit a row:
+             <tr hx-trigger="cancel" class="editing">
+                <td><input name="description" value="..."></td>
+                <td><input name="start_time" ...></td>
+                ...
+                <td><button hx-put ... hx-include="closest tr">Save</button></td>
+             </tr>
+             
+             Let's restructure `edit-entry-row` to NOT wrap in `<form>`.
+             Instead, put `hx-put` on the "Save" button and use `hx-include="closest tr"`.
+        -->
+        <input type="text" name="description" value="{{.Description}}" class="form-control" autofocus>
     </td>
-    <td>{{.StartTime.Format "Jan 02 15:04:05"}}</td>
     <td>
-        {{if .EndTime.Valid}}
-            {{.EndTime.Time.Format "15:04:05"}}
-        {{else}}
-            <em>Active</em>
-        {{end}}
+        <input type="datetime-local" name="start_time" value="{{.StartTime.Format "2006-01-02T15:04:05"}}" step="1">
     </td>
-    <td></td>
+    <td>
+        <input type="datetime-local" name="end_time" 
+               value="{{if .EndTime.Valid}}{{.EndTime.Time.Format "2006-01-02T15:04:05"}}{{end}}" step="1">
+    </td>
+    <td>
+        <button class="btn btn-sm btn-primary" 
+                hx-put="/entry/{{.ID}}" 
+                hx-target="#entry-{{.ID}}" 
+                hx-swap="outerHTML"
+                hx-include="closest tr">
+            Save
+        </button>
+        <button class="btn btn-sm" 
+                hx-get="/entry/{{.ID}}" 
+                hx-target="#entry-{{.ID}}" 
+                hx-swap="outerHTML">
+            Cancel
+        </button>
+    </td>
 </tr>
 {{end}}

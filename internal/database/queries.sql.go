@@ -112,31 +112,6 @@ func (q *Queries) ListTimeEntries(ctx context.Context) ([]TimeEntry, error) {
 	return items, nil
 }
 
-const updateEntryDescription = `-- name: UpdateEntryDescription :one
-UPDATE time_entries
-SET description = ?
-WHERE id = ?
-RETURNING id, description, start_time, end_time, created_at
-`
-
-type UpdateEntryDescriptionParams struct {
-	Description string `json:"description"`
-	ID          int64  `json:"id"`
-}
-
-func (q *Queries) UpdateEntryDescription(ctx context.Context, arg UpdateEntryDescriptionParams) (TimeEntry, error) {
-	row := q.db.QueryRowContext(ctx, updateEntryDescription, arg.Description, arg.ID)
-	var i TimeEntry
-	err := row.Scan(
-		&i.ID,
-		&i.Description,
-		&i.StartTime,
-		&i.EndTime,
-		&i.CreatedAt,
-	)
-	return i, err
-}
-
 const updateTimeEntry = `-- name: UpdateTimeEntry :one
 UPDATE time_entries
 SET end_time = ?
@@ -151,6 +126,38 @@ type UpdateTimeEntryParams struct {
 
 func (q *Queries) UpdateTimeEntry(ctx context.Context, arg UpdateTimeEntryParams) (TimeEntry, error) {
 	row := q.db.QueryRowContext(ctx, updateTimeEntry, arg.EndTime, arg.ID)
+	var i TimeEntry
+	err := row.Scan(
+		&i.ID,
+		&i.Description,
+		&i.StartTime,
+		&i.EndTime,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const updateTimeEntryFull = `-- name: UpdateTimeEntryFull :one
+UPDATE time_entries
+SET description = ?, start_time = ?, end_time = ?
+WHERE id = ?
+RETURNING id, description, start_time, end_time, created_at
+`
+
+type UpdateTimeEntryFullParams struct {
+	Description string       `json:"description"`
+	StartTime   time.Time    `json:"start_time"`
+	EndTime     sql.NullTime `json:"end_time"`
+	ID          int64        `json:"id"`
+}
+
+func (q *Queries) UpdateTimeEntryFull(ctx context.Context, arg UpdateTimeEntryFullParams) (TimeEntry, error) {
+	row := q.db.QueryRowContext(ctx, updateTimeEntryFull,
+		arg.Description,
+		arg.StartTime,
+		arg.EndTime,
+		arg.ID,
+	)
 	var i TimeEntry
 	err := row.Scan(
 		&i.ID,
