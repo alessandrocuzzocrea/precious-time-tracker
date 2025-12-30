@@ -4,7 +4,7 @@ A simple, efficient, and lightweight time tracking application built with **Go**
 
 ![Precious Time Tracker](https://img.shields.io/badge/Status-Active-brightgreen)
 ![Go Version](https://img.shields.io/badge/Go-1.25.5-blue)
-![CI/CD](https://github.com/user/precious-time-tracker/actions/workflows/ci-cd.yaml/badge.svg)
+![CI/CD](https://github.com/alessandrocuzzocrea/precious-time-tracker/actions/workflows/ci-cd.yaml/badge.svg)
 
 ## Features
 
@@ -36,7 +36,7 @@ A simple, efficient, and lightweight time tracking application built with **Go**
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/user/precious-time-tracker.git
+   git clone https://github.com/alessandrocuzzocrea/precious-time-tracker.git
    cd precious-time-tracker
    ```
 
