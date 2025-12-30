@@ -1,6 +1,7 @@
 package server
 
 import (
+	"database/sql"
 	"net/http"
 
 	"github.com/user/precious-time-tracker/internal/database"
@@ -8,12 +9,14 @@ import (
 
 type Server struct {
 	DB     *database.Queries
+	RawDB  *sql.DB
 	Router *http.ServeMux
 }
 
-func NewServer(db *database.Queries) *Server {
+func NewServer(db *database.Queries, rawDB *sql.DB) *Server {
 	s := &Server{
 		DB:     db,
+		RawDB:  rawDB,
 		Router: http.NewServeMux(),
 	}
 	s.routes()
