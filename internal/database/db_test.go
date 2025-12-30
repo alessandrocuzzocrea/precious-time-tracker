@@ -165,3 +165,45 @@ func TestDeleteCascade(t *testing.T) {
 		t.Errorf("Cascade failed! Expected 0 tags after entry delete, got %d. Foreign keys might not be enabled.", len(tagsAfter))
 	}
 }
+
+func TestDeleteEntryKeepsTags(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("failed to open db: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	if _, err := db.Exec("PRAGMA foreign_keys = ON;"); err != nil {
+		t.Fatalf("failed to enable foreign keys: %v", err)
+	}
+
+	goose.SetBaseFS(schema.FS)
+	if err := goose.SetDialect("sqlite"); err != nil {
+		t.Fatalf("failed to set dialect: %v", err)
+	}
+	if err := goose.Up(db, "."); err != nil {
+		t.Fatalf("failed to run migrations: %v", err)
+	}
+
+	q := New(db)
+	ctx := context.Background()
+
+	// 1. Create Data
+	entry, _ := q.CreateTimeEntry(ctx, CreateTimeEntryParams{Description: "T", StartTime: time.Now()})
+	tag, _ := q.CreateTag(ctx, "persistent_tag")
+	_ = q.CreateTimeEntryTag(ctx, CreateTimeEntryTagParams{TimeEntryID: entry.ID, TagID: tag.ID})
+
+	// 2. Delete Entry
+	if err := q.DeleteTimeEntry(ctx, entry.ID); err != nil {
+		t.Fatalf("DeleteTimeEntry failed: %v", err)
+	}
+
+	// 3. Verify Tag still exists
+	fetchedTag, err := q.GetTagByName(ctx, "persistent_tag")
+	if err != nil {
+		t.Fatalf("Tag should still exist: %v", err)
+	}
+	if fetchedTag.ID != tag.ID {
+		t.Errorf("Tag ID mismatch")
+	}
+}
