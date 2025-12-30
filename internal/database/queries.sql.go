@@ -59,6 +59,24 @@ func (q *Queries) GetActiveTimeEntry(ctx context.Context) (TimeEntry, error) {
 	return i, err
 }
 
+const getTimeEntry = `-- name: GetTimeEntry :one
+SELECT id, description, start_time, end_time, created_at FROM time_entries
+WHERE id = ?
+`
+
+func (q *Queries) GetTimeEntry(ctx context.Context, id int64) (TimeEntry, error) {
+	row := q.db.QueryRowContext(ctx, getTimeEntry, id)
+	var i TimeEntry
+	err := row.Scan(
+		&i.ID,
+		&i.Description,
+		&i.StartTime,
+		&i.EndTime,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const listTimeEntries = `-- name: ListTimeEntries :many
 SELECT id, description, start_time, end_time, created_at FROM time_entries
 ORDER BY start_time DESC
@@ -92,6 +110,31 @@ func (q *Queries) ListTimeEntries(ctx context.Context) ([]TimeEntry, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateEntryDescription = `-- name: UpdateEntryDescription :one
+UPDATE time_entries
+SET description = ?
+WHERE id = ?
+RETURNING id, description, start_time, end_time, created_at
+`
+
+type UpdateEntryDescriptionParams struct {
+	Description string `json:"description"`
+	ID          int64  `json:"id"`
+}
+
+func (q *Queries) UpdateEntryDescription(ctx context.Context, arg UpdateEntryDescriptionParams) (TimeEntry, error) {
+	row := q.db.QueryRowContext(ctx, updateEntryDescription, arg.Description, arg.ID)
+	var i TimeEntry
+	err := row.Scan(
+		&i.ID,
+		&i.Description,
+		&i.StartTime,
+		&i.EndTime,
+		&i.CreatedAt,
+	)
+	return i, err
 }
 
 const updateTimeEntry = `-- name: UpdateTimeEntry :one

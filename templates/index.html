@@ -26,21 +26,12 @@
                 <th>Description</th>
                 <th>Start</th>
                 <th>End</th>
+                <th>Actions</th>
             </tr>
         </thead>
         <tbody>
             {{range .Entries}}
-            <tr>
-                <td>{{.Description}}</td>
-                <td>{{.StartTime.Format "Jan 02 15:04:05"}}</td>
-                <td>
-                    {{if .EndTime.Valid}}
-                        {{.EndTime.Time.Format "15:04:05"}}
-                    {{else}}
-                        <em>Active</em>
-                    {{end}}
-                </td>
-            </tr>
+                {{template "entry-row" .}}
             {{end}}
         </tbody>
     </table>

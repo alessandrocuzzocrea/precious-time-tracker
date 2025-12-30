@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"time"
 
+	"strconv"
+
 	"github.com/user/precious-time-tracker/internal/database"
 )
 
@@ -14,13 +16,18 @@ func (s *Server) routes() {
 	s.Router.HandleFunc("GET /", s.handleIndex)
 	s.Router.HandleFunc("POST /start", s.handleStartTimer)
 	s.Router.HandleFunc("POST /stop", s.handleStopTimer)
+	s.Router.HandleFunc("GET /entry/{id}", s.handleGetEntry)
+	s.Router.HandleFunc("GET /entry/{id}/edit", s.handleEditEntry)
+	s.Router.HandleFunc("PUT /entry/{id}", s.handleUpdateEntry)
 	s.Router.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 }
 
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	// Parse templates
 	// Using relative path execution from root
-	tmpl, err := template.ParseFiles("templates/base.html", "templates/index.html")
+	// Parse templates
+	// Using relative path execution from root
+	tmpl, err := template.ParseFiles("templates/base.html", "templates/index.html", "templates/fragments.html")
 	if err != nil {
 		http.Error(w, "Template error: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -101,4 +108,88 @@ func (s *Server) handleStopTimer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+func (s *Server) handleGetEntry(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	entry, err := s.DB.GetTimeEntry(r.Context(), id)
+	if err != nil {
+		http.Error(w, "Entry not found", http.StatusNotFound)
+		return
+	}
+
+	tmpl, err := template.ParseFiles("templates/fragments.html")
+	if err != nil {
+		http.Error(w, "Template error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if err := tmpl.ExecuteTemplate(w, "entry-row", entry); err != nil {
+		log.Printf("Template execution error: %v", err)
+	}
+}
+
+func (s *Server) handleEditEntry(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	entry, err := s.DB.GetTimeEntry(r.Context(), id)
+	if err != nil {
+		http.Error(w, "Entry not found", http.StatusNotFound)
+		return
+	}
+
+	tmpl, err := template.ParseFiles("templates/fragments.html")
+	if err != nil {
+		http.Error(w, "Template error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if err := tmpl.ExecuteTemplate(w, "edit-entry-row", entry); err != nil {
+		log.Printf("Template execution error: %v", err)
+	}
+}
+
+func (s *Server) handleUpdateEntry(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	description := r.FormValue("description")
+	if description == "" {
+		http.Error(w, "Description required", http.StatusBadRequest)
+		return
+	}
+
+	entry, err := s.DB.UpdateEntryDescription(r.Context(), database.UpdateEntryDescriptionParams{
+		Description: description,
+		ID:          id,
+	})
+	if err != nil {
+		http.Error(w, "Failed to update: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	tmpl, err := template.ParseFiles("templates/fragments.html")
+	if err != nil {
+		http.Error(w, "Template error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if err := tmpl.ExecuteTemplate(w, "entry-row", entry); err != nil {
+		log.Printf("Template execution error: %v", err)
+	}
 }

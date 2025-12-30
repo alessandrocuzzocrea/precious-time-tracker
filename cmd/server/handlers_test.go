@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -10,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/pressly/goose/v3"
 	"github.com/user/precious-time-tracker/internal/database"
@@ -131,5 +133,69 @@ func TestHandleStartTimer(t *testing.T) {
 	}
 	if active.Description != "Integration Test Task" {
 		t.Errorf("expected description 'Integration Test Task', got %s", active.Description)
+	}
+}
+
+func TestHandleEditAndUpdate(t *testing.T) {
+	root, err := getProjectRoot()
+	if err != nil {
+		t.Fatalf("failed to find project root: %v", err)
+	}
+	oldWd, _ := os.Getwd()
+	if err := os.Chdir(root); err != nil {
+		t.Fatalf("failed to chdir to root: %v", err)
+	}
+	defer func() {
+		if err := os.Chdir(oldWd); err != nil {
+			t.Errorf("failed to restore wd: %v", err)
+		}
+	}()
+
+	srv := newTestServer(t)
+
+	// Create an entry
+	ctx := context.Background()
+	entry, err := srv.DB.CreateTimeEntry(ctx, database.CreateTimeEntryParams{
+		Description: "Old Description",
+		StartTime:   time.Now(),
+	})
+	if err != nil {
+		t.Fatalf("failed to create entry: %v", err)
+	}
+
+	// 1. GET /entry/{id}/edit -> Should return the form
+	req := httptest.NewRequest("GET", "/entry/"+fmt.Sprintf("%d", entry.ID)+"/edit", nil)
+	w := httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+
+	if w.Result().StatusCode != http.StatusOK {
+		t.Errorf("expected status 200, got %d", w.Result().StatusCode)
+	}
+	if !strings.Contains(w.Body.String(), "input type=\"text\"") {
+		t.Errorf("expected body to contain input field")
+	}
+
+	// 2. PUT /entry/{id} -> Should update description
+	form := url.Values{}
+	form.Add("description", "New Description")
+	req = httptest.NewRequest("PUT", "/entry/"+fmt.Sprintf("%d", entry.ID), strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w = httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+
+	if w.Result().StatusCode != http.StatusOK {
+		t.Errorf("expected status 200, got %d", w.Result().StatusCode)
+	}
+	if !strings.Contains(w.Body.String(), "New Description") {
+		t.Errorf("expected response to contain new description")
+	}
+
+	// Verify DB
+	updated, err := srv.DB.GetTimeEntry(ctx, entry.ID)
+	if err != nil {
+		t.Fatalf("failed to get entry: %v", err)
+	}
+	if updated.Description != "New Description" {
+		t.Errorf("expected description 'New Description', got %s", updated.Description)
 	}
 }

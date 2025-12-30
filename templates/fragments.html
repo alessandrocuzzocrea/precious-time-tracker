@@ -1,0 +1,47 @@
+{{define "entry-row"}}
+<tr id="entry-{{.ID}}">
+    <td>{{.Description}}</td>
+    <td>{{.StartTime.Format "Jan 02 15:04:05"}}</td>
+    <td>
+        {{if .EndTime.Valid}}
+            {{.EndTime.Time.Format "15:04:05"}}
+        {{else}}
+            <em>Active</em>
+        {{end}}
+    </td>
+    <td>
+        <button class="btn btn-sm" 
+                hx-get="/entry/{{.ID}}/edit" 
+                hx-target="#entry-{{.ID}}" 
+                hx-swap="outerHTML">
+            Edit
+        </button>
+    </td>
+</tr>
+{{end}}
+
+{{define "edit-entry-row"}}
+<tr id="entry-{{.ID}}">
+    <td>
+        <form hx-put="/entry/{{.ID}}" hx-target="#entry-{{.ID}}" hx-swap="outerHTML">
+            <input type="text" name="description" value="{{.Description}}" autofocus>
+            <button type="submit" class="btn btn-sm btn-primary">Save</button>
+            <button type="button" class="btn btn-sm" 
+                    hx-get="/entry/{{.ID}}" 
+                    hx-target="#entry-{{.ID}}" 
+                    hx-swap="outerHTML">
+                Cancel
+            </button>
+        </form>
+    </td>
+    <td>{{.StartTime.Format "Jan 02 15:04:05"}}</td>
+    <td>
+        {{if .EndTime.Valid}}
+            {{.EndTime.Time.Format "15:04:05"}}
+        {{else}}
+            <em>Active</em>
+        {{end}}
+    </td>
+    <td></td>
+</tr>
+{{end}}

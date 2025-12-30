@@ -23,3 +23,13 @@ SELECT * FROM time_entries
 WHERE end_time IS NULL
 ORDER BY start_time DESC
 LIMIT 1;
+
+-- name: UpdateEntryDescription :one
+UPDATE time_entries
+SET description = ?
+WHERE id = ?
+RETURNING *;
+
+-- name: GetTimeEntry :one
+SELECT * FROM time_entries
+WHERE id = ?;
