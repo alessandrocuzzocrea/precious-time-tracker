@@ -5,9 +5,11 @@
             <span class="category-badge" style="background-color: {{.CategoryColor.String}};">
                 {{.CategoryName.String}}
             </span>
+        {{else}}
+            <span style="color: #ccc; font-size: 0.8rem;">-</span>
         {{end}}
-        {{.Description}}
     </td>
+    <td>{{.Description}}</td>
     <td>{{.StartTime.Format "Jan 02 15:04:05"}}</td>
     <td>
         {{if .EndTime.Valid}}
@@ -38,19 +40,19 @@
 {{define "edit-entry-row"}}
 <tr id="entry-{{.Entry.ID}}">
     <td>
+        <select name="category_id" class="form-control" style="width: auto;">
+            <option value="">No Category</option>
+            {{$selectedCatID := .Entry.CategoryID.Int64}}
+            {{range .Categories}}
+                <option value="{{.ID}}" {{if eq .ID $selectedCatID}}selected{{end}}>{{.Name}}</option>
+            {{end}}
+        </select>
+    </td>
+    <td>
         {{if .Error}}
             <div style="color: red; font-size: 0.8em; margin-bottom: 5px;">{{.Error}}</div>
         {{end}}
-        <div style="display: flex; gap: 5px;">
-            <select name="category_id" class="form-control" style="width: auto;">
-                <option value="">No Category</option>
-                {{$selectedCatID := .Entry.CategoryID.Int64}}
-                {{range .Categories}}
-                    <option value="{{.ID}}" {{if eq .ID $selectedCatID}}selected{{end}}>{{.Name}}</option>
-                {{end}}
-            </select>
-            <input type="text" name="description" value="{{.Entry.Description}}" class="form-control" autofocus style="flex: 1;">
-        </div>
+        <input type="text" name="description" value="{{.Entry.Description}}" class="form-control" autofocus>
     </td>
     <td>
         <input type="text" name="start_time" 
