@@ -8,6 +8,15 @@
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
+    <div id="sticky-active-bar" class="sticky-bar" {{if .Active}}style="display: flex;" data-start-time="{{.Active.StartTime.Format "2006-01-02T15:04:05Z07:00"}}"{{else}}style="display: none;"{{end}}>
+        <div class="sticky-bar-content">
+            <span class="sticky-description">Tracking: <strong>{{if .Active}}{{.Active.Description}}{{end}}</strong></span>
+            <span class="sticky-duration-container">Duration: <span id="sticky-duration">0s</span></span>
+            <form action="/stop" method="POST" style="margin: 0;">
+                <button type="submit" class="btn btn-stop btn-sm">Stop</button>
+            </form>
+        </div>
+    </div>
     <div class="container">
         <header>
             <h1>Precious Time Tracker</h1>
@@ -22,8 +31,13 @@
     </div>
     <script>
         function updateActiveDuration() {
-            const activeTimer = document.getElementById('active-timer');
-            if (!activeTimer) return;
+            // Priority: Page-specific active-timer (often enhanced with more meta)
+            // Fallback: Global sticky-active-bar
+            const activePageTimer = document.getElementById('active-timer');
+            const stickyBar = document.getElementById('sticky-active-bar');
+            
+            const activeTimer = activePageTimer || stickyBar;
+            if (!activeTimer || activeTimer.style.display === 'none') return;
 
             const startTimeStr = activeTimer.dataset.startTime;
             if (!startTimeStr) return;
@@ -32,13 +46,7 @@
             const now = new Date();
             const diffMs = now - startTime;
 
-            const durationDisplay = document.getElementById('active-duration');
-            if (!durationDisplay) return;
-
-            if (diffMs < 0) {
-                durationDisplay.textContent = "0s";
-                return;
-            }
+            if (diffMs < 0) return;
 
             const seconds = Math.floor((diffMs / 1000) % 60);
             const minutes = Math.floor((diffMs / (1000 * 60)) % 60);
@@ -49,7 +57,13 @@
             if (minutes > 0) durFunc.push(minutes + "m");
             durFunc.push(seconds + "s");
 
-            durationDisplay.textContent = durFunc.join(" ");
+            const formatted = durFunc.join(" ");
+
+            const pageDurationDisplay = document.getElementById('active-duration');
+            if (pageDurationDisplay) pageDurationDisplay.textContent = formatted;
+
+            const stickyDurationDisplay = document.getElementById('sticky-duration');
+            if (stickyDurationDisplay) stickyDurationDisplay.textContent = formatted;
         }
 
         setInterval(updateActiveDuration, 1000);

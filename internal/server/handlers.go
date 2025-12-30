@@ -37,7 +37,7 @@ func formatDuration(start time.Time, end sql.NullTime) string {
 	return d.Round(time.Second).String()
 }
 
-func (s *Server) render(w http.ResponseWriter, tmplName string, data interface{}, files ...string) {
+func (s *Server) render(w http.ResponseWriter, r *http.Request, tmplName string, data interface{}, files ...string) {
 	funcs := template.FuncMap{
 		"duration": formatDuration,
 	}
@@ -50,12 +50,40 @@ func (s *Server) render(w http.ResponseWriter, tmplName string, data interface{}
 		return
 	}
 
+	// Prepare data for rendering
+	var finalData interface{}
 	if tmplName == "" {
-		if err := t.ExecuteTemplate(w, "base.html", data); err != nil {
+		// Full page render: ensure Active entry is available for the sticky bar
+		active, err := s.Service.GetActiveTimeEntry(r.Context())
+		if err != nil && err != sql.ErrNoRows {
+			log.Printf("Error getting active entry for render: %v", err)
+		}
+
+		m := make(map[string]interface{})
+		if data != nil {
+			if existingMap, ok := data.(map[string]interface{}); ok {
+				m = existingMap
+			} else {
+				m["PageData"] = data
+			}
+		}
+
+		if err == nil {
+			m["Active"] = active
+		} else {
+			m["Active"] = nil
+		}
+		finalData = m
+	} else {
+		finalData = data
+	}
+
+	if tmplName == "" {
+		if err := t.ExecuteTemplate(w, "base.html", finalData); err != nil {
 			log.Printf("Template execution error: %v", err)
 		}
 	} else {
-		if err := t.ExecuteTemplate(w, tmplName, data); err != nil {
+		if err := t.ExecuteTemplate(w, tmplName, finalData); err != nil {
 			log.Printf("Template execution error: %v", err)
 		}
 	}
@@ -68,20 +96,12 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		entries = []database.TimeEntry{}
 	}
 
-	active, err := s.Service.GetActiveTimeEntry(r.Context())
-	if err != nil && err != sql.ErrNoRows {
-		log.Printf("Error getting active entry: %v", err)
-	}
-
 	data := map[string]interface{}{
 		"Entries": entries,
-		"Active":  nil,
 	}
-	if err == nil {
-		data["Active"] = active
-	}
+	// Active will be filled by render if tmplName is ""
 
-	s.render(w, "", data, "templates/base.html", "templates/index.html")
+	s.render(w, r, "", data, "templates/base.html", "templates/index.html")
 }
 
 func (s *Server) handleStartTimer(w http.ResponseWriter, r *http.Request) {
@@ -119,7 +139,7 @@ func (s *Server) handleGetEntry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.render(w, "entry-row", entry)
+	s.render(w, r, "entry-row", entry)
 }
 
 func (s *Server) handleEditEntry(w http.ResponseWriter, r *http.Request) {
@@ -136,7 +156,7 @@ func (s *Server) handleEditEntry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.render(w, "edit-entry-row", editData{Entry: entry})
+	s.render(w, r, "edit-entry-row", editData{Entry: entry})
 }
 
 func (s *Server) handleUpdateEntry(w http.ResponseWriter, r *http.Request) {
@@ -179,7 +199,7 @@ func (s *Server) handleUpdateEntry(w http.ResponseWriter, r *http.Request) {
 	startTimeStr := r.FormValue("start_time")
 	startTime, err := parseTime(startTimeStr)
 	if err != nil {
-		s.render(w, "edit-entry-row", editData{Entry: originalEntry, Error: "Invalid start time format"})
+		s.render(w, r, "edit-entry-row", editData{Entry: originalEntry, Error: "Invalid start time format"})
 		return
 	}
 
@@ -188,7 +208,7 @@ func (s *Server) handleUpdateEntry(w http.ResponseWriter, r *http.Request) {
 	if endTimeStr != "" {
 		et, err := parseTime(endTimeStr)
 		if err != nil {
-			s.render(w, "edit-entry-row", editData{Entry: originalEntry, Error: "Invalid end time format"})
+			s.render(w, r, "edit-entry-row", editData{Entry: originalEntry, Error: "Invalid end time format"})
 			return
 		}
 		if !et.After(startTime) {
@@ -196,7 +216,7 @@ func (s *Server) handleUpdateEntry(w http.ResponseWriter, r *http.Request) {
 			unsavedEntry.Description = description
 			unsavedEntry.StartTime = startTime
 			unsavedEntry.EndTime = sql.NullTime{Time: et, Valid: true}
-			s.render(w, "edit-entry-row", editData{Entry: unsavedEntry, Error: "End time must be after start time"})
+			s.render(w, r, "edit-entry-row", editData{Entry: unsavedEntry, Error: "End time must be after start time"})
 			return
 		}
 		endTime = sql.NullTime{Time: et, Valid: true}
@@ -204,11 +224,11 @@ func (s *Server) handleUpdateEntry(w http.ResponseWriter, r *http.Request) {
 
 	entry, err := s.Service.UpdateTimeEntry(r.Context(), id, description, startTime, endTime)
 	if err != nil {
-		s.render(w, "edit-entry-row", editData{Entry: originalEntry, Error: "Failed to update: " + err.Error()})
+		s.render(w, r, "edit-entry-row", editData{Entry: originalEntry, Error: "Failed to update: " + err.Error()})
 		return
 	}
 
-	s.render(w, "entry-row", entry)
+	s.render(w, r, "entry-row", entry)
 }
 
 func (s *Server) handleDeleteEntry(w http.ResponseWriter, r *http.Request) {
@@ -235,5 +255,9 @@ func (s *Server) handleListTags(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.render(w, "", tags, "templates/base.html", "templates/tags.html")
+	data := map[string]interface{}{
+		"Tags": tags,
+	}
+
+	s.render(w, r, "", data, "templates/base.html", "templates/tags.html")
 }

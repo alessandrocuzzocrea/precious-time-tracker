@@ -2,9 +2,9 @@
 <div class="tags-page">
     <h2>All Tags</h2>
     <div class="tags-list">
-        {{if .}}
+        {{if .Tags}}
             <ul>
-                {{range .}}
+                {{range .Tags}}
                     <li>#{{.Name}}</li>
                 {{end}}
             </ul>
