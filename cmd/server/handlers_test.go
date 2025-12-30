@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"fmt"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -12,11 +14,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/pressly/goose/v3"
 	"github.com/alessandrocuzzocrea/precious-time-tracker/internal/database"
 	"github.com/alessandrocuzzocrea/precious-time-tracker/internal/server"
 	"github.com/alessandrocuzzocrea/precious-time-tracker/internal/service"
 	"github.com/alessandrocuzzocrea/precious-time-tracker/sql/schema"
+	"github.com/pressly/goose/v3"
 
 	_ "modernc.org/sqlite"
 )
@@ -250,5 +252,103 @@ func TestHandleUpdateActiveEntry(t *testing.T) {
 	}
 	if !active.CategoryID.Valid || active.CategoryID.Int64 != cat.ID {
 		t.Errorf("expected category ID %d, got %v", cat.ID, active.CategoryID)
+	}
+}
+
+func TestHandleLists(t *testing.T) {
+	root, _ := getProjectRoot()
+	oldWd, _ := os.Getwd()
+	os.Chdir(root)
+	defer os.Chdir(oldWd)
+
+	srv := newTestServer(t)
+
+	// List Tags
+	req := httptest.NewRequest("GET", "/tags", nil)
+	w := httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+	if w.Result().StatusCode != http.StatusOK {
+		t.Errorf("GET /tags expected 200, got %d", w.Result().StatusCode)
+	}
+
+	// List Categories
+	req = httptest.NewRequest("GET", "/categories", nil)
+	w = httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+	if w.Result().StatusCode != http.StatusOK {
+		t.Errorf("GET /categories expected 200, got %d", w.Result().StatusCode)
+	}
+}
+
+func TestHandleReports(t *testing.T) {
+	root, _ := getProjectRoot()
+	oldWd, _ := os.Getwd()
+	os.Chdir(root)
+	defer os.Chdir(oldWd)
+
+	srv := newTestServer(t)
+
+	// Test various periods
+	periods := []string{"today", "week", "month", "year", "all"}
+	for _, p := range periods {
+		req := httptest.NewRequest("GET", "/reports?period="+p, nil)
+		w := httptest.NewRecorder()
+		srv.ServeHTTP(w, req)
+		if w.Result().StatusCode != http.StatusOK {
+			t.Errorf("GET /reports?period=%s expected 200, got %d", p, w.Result().StatusCode)
+		}
+	}
+}
+
+func TestHandleDataPageAndExport(t *testing.T) {
+	root, _ := getProjectRoot()
+	oldWd, _ := os.Getwd()
+	os.Chdir(root)
+	defer os.Chdir(oldWd)
+
+	srv := newTestServer(t)
+
+	// Data Page
+	req := httptest.NewRequest("GET", "/data", nil)
+	w := httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+	if w.Result().StatusCode != http.StatusOK {
+		t.Errorf("GET /data expected 200, got %d", w.Result().StatusCode)
+	}
+
+	// Export CSV
+	req = httptest.NewRequest("GET", "/export", nil)
+	w = httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+	if w.Result().StatusCode != http.StatusOK {
+		t.Errorf("GET /export expected 200, got %d", w.Result().StatusCode)
+	}
+	if w.Header().Get("Content-Type") != "text/csv" {
+		t.Errorf("expected Content-Type text/csv, got %s", w.Header().Get("Content-Type"))
+	}
+}
+
+func TestHandleImportPreview(t *testing.T) {
+	root, _ := getProjectRoot()
+	oldWd, _ := os.Getwd()
+	os.Chdir(root)
+	defer os.Chdir(oldWd)
+
+	srv := newTestServer(t)
+
+	// Prepare multipart form with a CSV file
+	var b bytes.Buffer
+	w := multipart.NewWriter(&b)
+	fw, _ := w.CreateFormFile("csv_file", "test.csv")
+	fw.Write([]byte("id,description,start_time,end_time,category\n,Test Item,2024-01-01T10:00:00Z,,Work"))
+	w.Close()
+
+	req := httptest.NewRequest("POST", "/import/preview", &b)
+	req.Header.Set("Content-Type", w.FormDataContentType())
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+
+	if rec.Result().StatusCode != http.StatusOK {
+		t.Errorf("POST /import/preview expected 200, got %d", rec.Result().StatusCode)
 	}
 }
