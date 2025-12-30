@@ -22,53 +22,39 @@
 {{end}}
 
 {{define "edit-entry-row"}}
-<tr id="entry-{{.ID}}">
+<tr id="entry-{{.Entry.ID}}">
     <td>
-        <!-- Form wraps the whole row inputs effectively by keeping them outside or using form attribute if they were separate... 
-             Wait, wrapping TR in Form is invalid HTML.
-             Browsers might handle it, but it's bad.
-             HTMX supports `hx-include` to include other inputs.
-             OR we can put the form inside one TD and use `form="myform"` attribute on inputs? No.
-             
-             Standard way to edit a row:
-             <tr hx-trigger="cancel" class="editing">
-                <td><input name="description" value="..."></td>
-                <td><input name="start_time" ...></td>
-                ...
-                <td><button hx-put ... hx-include="closest tr">Save</button></td>
-             </tr>
-             
-             Let's restructure `edit-entry-row` to NOT wrap in `<form>`.
-             Instead, put `hx-put` on the "Save" button and use `hx-include="closest tr"`.
-        -->
-        <input type="text" name="description" value="{{.Description}}" class="form-control" autofocus>
+        {{if .Error}}
+            <div style="color: red; font-size: 0.8em; margin-bottom: 5px;">{{.Error}}</div>
+        {{end}}
+        <input type="text" name="description" value="{{.Entry.Description}}" class="form-control" autofocus>
     </td>
     <td>
         <input type="text" name="start_time" 
-               value="{{.StartTime.Format "2006-01-02 15:04:05"}}" 
+               value="{{.Entry.StartTime.Format "2006-01-02 15:04:05"}}" 
                placeholder="YYYY-MM-DD HH:MM:SS"
                class="form-control"
                style="width: 160px;">
     </td>
     <td>
         <input type="text" name="end_time" 
-               value="{{if .EndTime.Valid}}{{.EndTime.Time.Format "2006-01-02 15:04:05"}}{{end}}" 
+               value="{{if .Entry.EndTime.Valid}}{{.Entry.EndTime.Time.Format "2006-01-02 15:04:05"}}{{end}}" 
                placeholder="YYYY-MM-DD HH:MM:SS"
                class="form-control"
                style="width: 160px;">
     </td>
-    <td>{{duration .StartTime .EndTime}}</td>
+    <td>{{duration .Entry.StartTime .Entry.EndTime}}</td>
     <td>
         <button class="btn btn-sm btn-primary" 
-                hx-put="/entry/{{.ID}}" 
-                hx-target="#entry-{{.ID}}" 
+                hx-put="/entry/{{.Entry.ID}}" 
+                hx-target="#entry-{{.Entry.ID}}" 
                 hx-swap="outerHTML"
                 hx-include="closest tr">
             Save
         </button>
         <button class="btn btn-sm" 
-                hx-get="/entry/{{.ID}}" 
-                hx-target="#entry-{{.ID}}" 
+                hx-get="/entry/{{.Entry.ID}}" 
+                hx-target="#entry-{{.Entry.ID}}" 
                 hx-swap="outerHTML">
             Cancel
         </button>

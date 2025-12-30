@@ -12,6 +12,11 @@ import (
 	"github.com/user/precious-time-tracker/internal/database"
 )
 
+type editData struct {
+	Entry database.TimeEntry
+	Error string
+}
+
 func (s *Server) routes() {
 	s.Router.HandleFunc("GET /", s.handleIndex)
 	s.Router.HandleFunc("POST /start", s.handleStartTimer)
@@ -179,7 +184,7 @@ func (s *Server) handleEditEntry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.render(w, "edit-entry-row", entry)
+	s.render(w, "edit-entry-row", editData{Entry: entry})
 }
 
 func (s *Server) handleUpdateEntry(w http.ResponseWriter, r *http.Request) {
@@ -212,10 +217,18 @@ func (s *Server) handleUpdateEntry(w http.ResponseWriter, r *http.Request) {
 		return time.Time{}, fmt.Errorf("invalid format")
 	}
 
+	// Fetch original entry to use as fallback/template
+	originalEntry, err := s.DB.GetTimeEntry(r.Context(), id)
+	if err != nil {
+		http.Error(w, "Entry not found", http.StatusNotFound)
+		return
+	}
+
 	startTimeStr := r.FormValue("start_time")
 	startTime, err := parseTime(startTimeStr)
 	if err != nil {
-		http.Error(w, "Invalid start time format (use YYYY-MM-DD HH:MM:SS): "+err.Error(), http.StatusBadRequest)
+		// Render with error
+		s.render(w, "edit-entry-row", editData{Entry: originalEntry, Error: "Invalid start time format"})
 		return
 	}
 
@@ -224,7 +237,16 @@ func (s *Server) handleUpdateEntry(w http.ResponseWriter, r *http.Request) {
 	if endTimeStr != "" {
 		et, err := parseTime(endTimeStr)
 		if err != nil {
-			http.Error(w, "Invalid end time format: "+err.Error(), http.StatusBadRequest)
+			s.render(w, "edit-entry-row", editData{Entry: originalEntry, Error: "Invalid end time format"})
+			return
+		}
+		if !et.After(startTime) {
+			// Construct entry with submitted values to preserve input
+			unsavedEntry := originalEntry
+			unsavedEntry.Description = description
+			unsavedEntry.StartTime = startTime
+			unsavedEntry.EndTime = sql.NullTime{Time: et, Valid: true}
+			s.render(w, "edit-entry-row", editData{Entry: unsavedEntry, Error: "End time must be after start time"})
 			return
 		}
 		endTime = sql.NullTime{Time: et, Valid: true}
@@ -237,7 +259,7 @@ func (s *Server) handleUpdateEntry(w http.ResponseWriter, r *http.Request) {
 		ID:          id,
 	})
 	if err != nil {
-		http.Error(w, "Failed to update: "+err.Error(), http.StatusInternalServerError)
+		s.render(w, "edit-entry-row", editData{Entry: originalEntry, Error: "Failed to update: " + err.Error()})
 		return
 	}
 
