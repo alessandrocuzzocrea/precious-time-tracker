@@ -1,9 +1,10 @@
 {{define "content"}}
 <div class="timer-controls">
     {{if .Active}}
-        <div class="active-timer">
+        <div class="active-timer" id="active-timer" data-start-time="{{.Active.StartTime.Format "2006-01-02T15:04:05Z07:00"}}">
             <p>Tracking: <strong>{{.Active.Description}}</strong></p>
             <p>Started at: {{.Active.StartTime.Format "15:04:05"}}</p>
+            <p>Duration: <span id="active-duration">0s</span></p>
             <form action="/stop" method="POST">
                 <button type="submit" class="btn btn-stop">Stop</button>
             </form>

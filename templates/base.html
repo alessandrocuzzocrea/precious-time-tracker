@@ -21,6 +21,40 @@
         </main>
     </div>
     <script>
+        function updateActiveDuration() {
+            const activeTimer = document.getElementById('active-timer');
+            if (!activeTimer) return;
+
+            const startTimeStr = activeTimer.dataset.startTime;
+            if (!startTimeStr) return;
+
+            const startTime = new Date(startTimeStr);
+            const now = new Date();
+            const diffMs = now - startTime;
+
+            const durationDisplay = document.getElementById('active-duration');
+            if (!durationDisplay) return;
+
+            if (diffMs < 0) {
+                durationDisplay.textContent = "0s";
+                return;
+            }
+
+            const seconds = Math.floor((diffMs / 1000) % 60);
+            const minutes = Math.floor((diffMs / (1000 * 60)) % 60);
+            const hours = Math.floor((diffMs / (1000 * 60 * 60)));
+
+            let durFunc = [];
+            if (hours > 0) durFunc.push(hours + "h");
+            if (minutes > 0) durFunc.push(minutes + "m");
+            durFunc.push(seconds + "s");
+
+            durationDisplay.textContent = durFunc.join(" ");
+        }
+
+        setInterval(updateActiveDuration, 1000);
+        updateActiveDuration(); // Initial call
+
         document.addEventListener('input', function(e) {
             if (e.target.classList.contains('time-input')) {
                 const row = e.target.closest('tr');
