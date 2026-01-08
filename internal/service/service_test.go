@@ -397,3 +397,63 @@ func TestGetReport(t *testing.T) {
 		t.Errorf("No Category not found in breakdown")
 	}
 }
+
+func TestGetReport_EdgeCases(t *testing.T) {
+	svc := newTestService(t)
+	ctx := context.Background()
+
+	now := time.Now()
+	startToday := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	endToday := startToday.AddDate(0, 0, 1).Add(-time.Second)
+
+	// 1. Empty Report (No entries)
+	// Ensures that 0 entries doesn't cause panic/div-by-zero even with mutations
+	report, err := svc.GetReport(ctx, ReportFilter{
+		StartDate:      startToday,
+		EndDate:        endToday,
+		CategoryFilter: 0,
+	})
+	if err != nil {
+		t.Fatalf("GetReport (empty) failed: %v", err)
+	}
+	if len(report.Entries) != 0 {
+		t.Errorf("expected 0 entries, got %d", len(report.Entries))
+	}
+	if report.TotalSeconds != 0 {
+		t.Errorf("expected 0 total seconds, got %d", report.TotalSeconds)
+	}
+	if len(report.CategoryBreakdown) != 0 {
+		t.Errorf("expected empty breakdown for empty report, got %v", report.CategoryBreakdown)
+	}
+
+	// 2. Report with Zero-Duration Entry
+	cat, _ := svc.CreateCategory(ctx, "ZeroCat", "#ffffff")
+	e1, _ := svc.StartTimer(ctx, "Instant Task", &cat.ID)
+	// Update to look like it started and ended at same second
+	_, err = svc.UpdateTimeEntry(ctx, e1.ID, e1.Description, now, sql.NullTime{Time: now, Valid: true}, &cat.ID)
+	if err != nil {
+		t.Fatalf("failed to update zero-duration entry: %v", err)
+	}
+
+	report, err = svc.GetReport(ctx, ReportFilter{
+		StartDate:      startToday,
+		EndDate:        endToday,
+		CategoryFilter: 0,
+	})
+	if err != nil {
+		t.Fatalf("GetReport (zero-duration) failed: %v", err)
+	}
+
+	if report.TotalSeconds != 0 {
+		t.Errorf("expected 0 total seconds, got %d", report.TotalSeconds)
+	}
+
+	for _, b := range report.CategoryBreakdown {
+		if b.TotalSeconds != 0 {
+			t.Errorf("expected 0 seconds for category, got %d", b.TotalSeconds)
+		}
+		if b.Percentage != b.Percentage { // NaN check
+			t.Errorf("Got NaN percentage for category %s, expected 0 or valid number", b.CategoryName)
+		}
+	}
+}
